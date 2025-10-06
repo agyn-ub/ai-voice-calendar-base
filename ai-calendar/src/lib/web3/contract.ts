@@ -1,9 +1,9 @@
-import { Contract, parseEther, formatEther, BrowserProvider } from 'ethers';
+import { parseEther, formatEther } from 'viem';
+import { useContractWrite, useContractRead, useWaitForTransaction } from 'wagmi';
 import MeetingStakeABI from '../contracts/MeetingStake.json';
-import { WalletService } from './wallet';
+import { CONTRACT_ADDRESSES, CURRENT_NETWORK } from '../ethereum/config';
 
-// This will be set from environment variable after deployment
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_MEETING_STAKE_ADDRESS || '';
+const CONTRACT_ADDRESS = CONTRACT_ADDRESSES[CURRENT_NETWORK].meetingStake;
 
 export interface Meeting {
   meetingId: string;
@@ -30,223 +30,90 @@ export interface Stake {
   isRefunded: boolean;
 }
 
-export class MeetingStakeContract {
-  private static contract: Contract | null = null;
+// Contract configuration for wagmi hooks
+export const contractConfig = {
+  address: CONTRACT_ADDRESS as `0x${string}`,
+  abi: MeetingStakeABI,
+};
 
+export class MeetingStakeContract {
   /**
-   * Get contract instance
+   * Helper to get contract config
    */
-  static async getContract(signer?: boolean): Promise<Contract> {
-    if (!CONTRACT_ADDRESS) {
+  static getContractConfig() {
+    if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS === '0x0000000000000000000000000000000000000000') {
       throw new Error('Contract address not configured');
     }
-
-    const provider = WalletService.getProvider();
-    
-    if (signer) {
-      const signer = await provider.getSigner();
-      return new Contract(CONTRACT_ADDRESS, MeetingStakeABI, signer);
-    }
-    
-    return new Contract(CONTRACT_ADDRESS, MeetingStakeABI, provider);
+    return contractConfig;
   }
 
   /**
-   * Create a new meeting with staking requirement
+   * Parse meeting data for contract
    */
-  static async createMeeting(
+  static parseMeetingData(
     meetingId: string,
     eventId: string,
-    requiredStake: string, // in FLOW
+    requiredStake: string, // in ETH
     startTime: Date,
     endTime: Date
-  ): Promise<string> {
-    try {
-      const contract = await this.getContract(true);
-      
-      const tx = await contract.createMeeting(
-        meetingId,
-        eventId,
-        parseEther(requiredStake),
-        Math.floor(startTime.getTime() / 1000),
-        Math.floor(endTime.getTime() / 1000)
-      );
-      
-      await tx.wait();
-      return tx.hash;
-    } catch (error) {
-      console.error('Error creating meeting:', error);
-      throw error;
-    }
+  ) {
+    return {
+      meetingId,
+      eventId,
+      requiredStake: parseEther(requiredStake),
+      startTime: BigInt(Math.floor(startTime.getTime() / 1000)),
+      endTime: BigInt(Math.floor(endTime.getTime() / 1000)),
+    };
   }
 
   /**
-   * Stake FLOW for a meeting
+   * Parse stake amount for contract
    */
-  static async stakeForMeeting(
-    meetingId: string,
-    stakeAmount: string // in FLOW
-  ): Promise<string> {
-    try {
-      const contract = await this.getContract(true);
-      
-      const tx = await contract.stake(meetingId, {
-        value: parseEther(stakeAmount)
-      });
-      
-      await tx.wait();
-      return tx.hash;
-    } catch (error) {
-      console.error('Error staking for meeting:', error);
-      throw error;
-    }
+  static parseStakeAmount(stakeAmount: string) {
+    return parseEther(stakeAmount);
   }
 
   /**
-   * Generate attendance code (for organizers)
+   * Format meeting info from contract
    */
-  static async generateAttendanceCode(
-    meetingId: string,
-    code: string
-  ): Promise<string> {
-    try {
-      const contract = await this.getContract(true);
-      
-      const tx = await contract.generateAttendanceCode(meetingId, code);
-      await tx.wait();
-      return tx.hash;
-    } catch (error) {
-      console.error('Error generating attendance code:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Submit attendance code (for attendees)
-   */
-  static async submitAttendanceCode(
-    meetingId: string,
-    code: string
-  ): Promise<string> {
-    try {
-      const contract = await this.getContract(true);
-      
-      const tx = await contract.submitAttendanceCode(meetingId, code);
-      await tx.wait();
-      return tx.hash;
-    } catch (error) {
-      console.error('Error submitting attendance code:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Settle meeting and distribute stakes
-   */
-  static async settleMeeting(meetingId: string): Promise<string> {
-    try {
-      const contract = await this.getContract(true);
-      
-      const tx = await contract.settleMeeting(meetingId);
-      await tx.wait();
-      return tx.hash;
-    } catch (error) {
-      console.error('Error settling meeting:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get meeting info
-   */
-  static async getMeetingInfo(meetingId: string): Promise<Meeting | null> {
-    try {
-      const contract = await this.getContract(false);
-      const info = await contract.getMeetingInfo(meetingId);
-      
-      // Check if meeting exists
-      if (info.startTime === 0n) {
-        return null;
-      }
-      
-      return {
-        meetingId: info.meetingId,
-        eventId: info.eventId,
-        organizer: info.organizer,
-        requiredStake: info.requiredStake,
-        startTime: info.startTime,
-        endTime: info.endTime,
-        checkInDeadline: info.checkInDeadline,
-        attendanceCode: info.attendanceCode,
-        codeValidUntil: info.codeValidUntil,
-        isSettled: info.isSettled,
-        totalStaked: info.totalStaked,
-        totalRefunded: info.totalRefunded,
-        totalForfeited: info.totalForfeited,
-      };
-    } catch (error) {
-      console.error('Error getting meeting info:', error);
+  static formatMeetingInfo(info: any): Meeting | null {
+    if (!info || info.startTime === 0n) {
       return null;
     }
+    
+    return {
+      meetingId: info.meetingId,
+      eventId: info.eventId,
+      organizer: info.organizer,
+      requiredStake: info.requiredStake,
+      startTime: info.startTime,
+      endTime: info.endTime,
+      checkInDeadline: info.checkInDeadline,
+      attendanceCode: info.attendanceCode,
+      codeValidUntil: info.codeValidUntil,
+      isSettled: info.isSettled,
+      totalStaked: info.totalStaked,
+      totalRefunded: info.totalRefunded,
+      totalForfeited: info.totalForfeited,
+    };
   }
 
   /**
-   * Get stake info for a specific address
+   * Format stake info from contract
    */
-  static async getStakeInfo(
-    meetingId: string,
-    address: string
-  ): Promise<Stake | null> {
-    try {
-      const contract = await this.getContract(false);
-      const info = await contract.getStakeInfo(meetingId, address);
-      
-      // Check if stake exists
-      if (info.amount === 0n) {
-        return null;
-      }
-      
-      return {
-        staker: info.staker,
-        amount: info.amount,
-        stakedAt: info.stakedAt,
-        hasCheckedIn: info.hasCheckedIn,
-        checkInTime: info.checkInTime,
-        isRefunded: info.isRefunded,
-      };
-    } catch (error) {
-      console.error('Error getting stake info:', error);
+  static formatStakeInfo(info: any): Stake | null {
+    if (!info || info.amount === 0n) {
       return null;
     }
-  }
-
-  /**
-   * Check if address has staked for meeting
-   */
-  static async hasStaked(
-    meetingId: string,
-    address: string
-  ): Promise<boolean> {
-    try {
-      const contract = await this.getContract(false);
-      return await contract.hasStaked(meetingId, address);
-    } catch (error) {
-      console.error('Error checking stake status:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Get all stakers for a meeting
-   */
-  static async getMeetingStakers(meetingId: string): Promise<string[]> {
-    try {
-      const contract = await this.getContract(false);
-      return await contract.getMeetingStakers(meetingId);
-    } catch (error) {
-      console.error('Error getting meeting stakers:', error);
-      return [];
-    }
+    
+    return {
+      staker: info.staker,
+      amount: info.amount,
+      stakedAt: info.stakedAt,
+      hasCheckedIn: info.hasCheckedIn,
+      checkInTime: info.checkInTime,
+      isRefunded: info.isRefunded,
+    };
   }
 
   /**

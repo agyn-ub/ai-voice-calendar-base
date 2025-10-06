@@ -11,6 +11,7 @@ const MEETING_STAKE_ABI = [
   'function getMeetingInfo(string meetingId) external view returns (tuple(string meetingId, string eventId, address organizer, uint256 requiredStake, uint256 startTime, uint256 endTime, uint256 checkInDeadline, string attendanceCode, uint256 codeValidUntil, bool isSettled, uint256 totalStaked, uint256 totalRefunded, uint256 totalForfeited))',
   'function getStakeInfo(string meetingId, address staker) external view returns (tuple(address staker, uint256 amount, uint256 stakedAt, bool hasCheckedIn, uint256 checkInTime, bool isRefunded))',
   'function hasStaked(string meetingId, address staker) external view returns (bool)',
+  'function getMeetingStakers(string meetingId) external view returns (address[])',
   'event MeetingCreated(string indexed meetingId, address indexed organizer, uint256 requiredStake, uint256 startTime, uint256 endTime)',
   'event StakeDeposited(string indexed meetingId, address indexed staker, uint256 amount)',
   'event AttendanceCodeGenerated(string indexed meetingId, string code, uint256 validUntil)',
@@ -111,6 +112,11 @@ export class MeetingStakeContract {
   async hasStaked(meetingId: string, stakerAddress: string): Promise<boolean> {
     if (!this.contract) throw new Error('Contract not initialized');
     return await this.contract.hasStaked(meetingId, stakerAddress);
+  }
+
+  async getMeetingStakers(meetingId: string): Promise<string[]> {
+    if (!this.contract) throw new Error('Contract not initialized');
+    return await this.contract.getMeetingStakers(meetingId);
   }
 
   getExplorerUrl(txHash: string): string {
