@@ -1,5 +1,4 @@
 import { parseEther, formatEther } from 'viem';
-import { useContractWrite, useContractRead, useWaitForTransaction } from 'wagmi';
 import MeetingStakeABI from '../contracts/MeetingStake.json';
 import { CONTRACT_ADDRESSES, CURRENT_NETWORK } from '../ethereum/config';
 
@@ -76,7 +75,21 @@ export class MeetingStakeContract {
   /**
    * Format meeting info from contract
    */
-  static formatMeetingInfo(info: any): Meeting | null {
+  static formatMeetingInfo(info: {
+    meetingId: string;
+    eventId: string;
+    organizer: string;
+    requiredStake: bigint;
+    startTime: bigint;
+    endTime: bigint;
+    checkInDeadline: bigint;
+    attendanceCode: string;
+    codeValidUntil: bigint;
+    isSettled: boolean;
+    totalStaked: bigint;
+    totalRefunded: bigint;
+    totalForfeited: bigint;
+  } | undefined): Meeting | null {
     if (!info || info.startTime === 0n) {
       return null;
     }
@@ -101,7 +114,14 @@ export class MeetingStakeContract {
   /**
    * Format stake info from contract
    */
-  static formatStakeInfo(info: any): Stake | null {
+  static formatStakeInfo(info: {
+    staker: string;
+    amount: bigint;
+    stakedAt: bigint;
+    hasCheckedIn: boolean;
+    checkInTime: bigint;
+    isRefunded: boolean;
+  } | undefined): Stake | null {
     if (!info || info.amount === 0n) {
       return null;
     }

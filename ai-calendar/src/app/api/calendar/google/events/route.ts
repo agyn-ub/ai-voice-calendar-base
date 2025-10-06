@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
                   stakeAmount: event.stakeRequired,
                   meetingId,
                   organizerName: createdEvent.organizer?.displayName,
-                  location: createdEvent.location
+                  location: createdEvent.location || undefined
                 });
 
                 console.log(`[Events] Sent stake invitations to ${attendeeEmails.length} attendees`);

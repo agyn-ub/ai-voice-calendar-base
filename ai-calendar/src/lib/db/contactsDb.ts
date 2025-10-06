@@ -262,7 +262,7 @@ class ContactsDatabase {
   /**
    * Sync wrapper for searchContactsByName - returns empty array
    */
-  public searchContactsByNameSync(accountId: number, searchQuery: string): ContactSearchResult[] {
+  public searchContactsByNameSync(): ContactSearchResult[] {
     console.warn('[ContactsDB] Using sync search - no results available until database loads');
     return [];
   }
@@ -270,7 +270,7 @@ class ContactsDatabase {
   /**
    * Sync wrapper for findBestMatch - returns null
    */
-  public findBestMatchSync(accountId: number, searchQuery: string): Contact | null {
+  public findBestMatchSync(): Contact | null {
     console.warn('[ContactsDB] Using sync match - no results available until database loads');
     return null;
   }
@@ -278,7 +278,7 @@ class ContactsDatabase {
   /**
    * Sync wrapper for getContactCount
    */
-  public getContactCountSync(accountId: number): number {
+  public getContactCountSync(): number {
     console.warn('[ContactsDB] Using sync count - returning 0 until database loads');
     return 0;
   }
@@ -286,7 +286,7 @@ class ContactsDatabase {
   /**
    * Sync wrapper for getContacts
    */
-  public getContactsSync(accountId: number, limit: number = 100): Contact[] {
+  public getContactsSync(): Contact[] {
     console.warn('[ContactsDB] Using sync get - returning empty until database loads');
     return [];
   }

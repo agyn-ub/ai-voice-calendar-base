@@ -29,7 +29,6 @@ export function OnchainProviders({ children }: { children: ReactNode }) {
               theme: 'base', // Use Base theme
             },
           }}
-          schemaId="0x4c5dacbc-111c-4215-b585-235f5eb87dc9" // Base mainnet schema ID
         >
           {children}
         </OnchainKitProvider>

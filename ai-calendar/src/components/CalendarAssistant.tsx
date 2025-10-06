@@ -16,7 +16,11 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  actions?: any[];
+  actions?: Array<{
+    type: string;
+    status: 'success' | 'error';
+    details?: unknown;
+  }>;
   needsDisambiguation?: boolean;
   ambiguousContacts?: AmbiguousContact[];
   pendingEvent?: PendingEvent;
@@ -310,7 +314,7 @@ export default function CalendarAssistant({ walletAddress, onCalendarUpdate }: C
                 {msg.ambiguousContacts.map((ambiguous, ambIdx) => (
                   <div key={ambIdx} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
                     <p className="text-sm text-gray-400 mb-3">
-                      Which <span className="font-semibold text-gray-200">"{ambiguous.searchQuery}"</span> did you mean?
+                      Which <span className="font-semibold text-gray-200">&quot;{ambiguous.searchQuery}&quot;</span> did you mean?
                     </p>
                     <div className="space-y-2">
                       {ambiguous.matches.map((match, matchIdx) => (

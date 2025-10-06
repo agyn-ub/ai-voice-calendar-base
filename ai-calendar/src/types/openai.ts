@@ -2,7 +2,7 @@ import { calendar_v3 } from 'googleapis';
 
 export interface CalendarToolCall {
   name: string;
-  arguments: Record<string, any>;
+  arguments: Record<string, unknown>;
 }
 
 export interface CalendarEventInput {
@@ -79,7 +79,7 @@ export interface AssistantResponse {
   actions_taken?: Array<{
     type: 'get_events' | 'create_event' | 'update_event' | 'delete_event' | 'search_events';
     status: 'success' | 'error';
-    details?: any;
+    details?: unknown;
   }>;
   events?: calendar_v3.Schema$Event[];
   conversation_id: string;

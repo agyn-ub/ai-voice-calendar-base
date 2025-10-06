@@ -9,7 +9,7 @@ interface MessageBubbleProps {
   actions?: Array<{
     type: string;
     status: 'success' | 'error';
-    details?: any;
+    details?: unknown;
   }>;
   onCopy?: () => void;
 }
@@ -40,7 +40,7 @@ export default function MessageBubble({
     // Basic markdown-like formatting
     return text
       .split('\n')
-      .map((line, i) => {
+      .map((line) => {
         // Bold text
         line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         // Italic text

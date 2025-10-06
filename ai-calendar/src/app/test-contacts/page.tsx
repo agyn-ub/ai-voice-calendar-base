@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { useRouter } from 'next/navigation';
 
@@ -24,7 +24,7 @@ interface SyncResult {
 
 export default function TestContactsPage() {
   const router = useRouter();
-  const { address: addr, isConnected } = useAccount();
+  const { address: addr } = useAccount();
 
   // State
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'not_connected'>('checking');
@@ -38,13 +38,49 @@ export default function TestContactsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(50);
 
+  const checkConnection = useCallback(async () => {
+    if (!addr) {
+      setConnectionStatus('not_connected');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/calendar/status?wallet_address=${addr}`);
+      const data = await response.json();
+      setConnectionStatus(data.connected ? 'connected' : 'not_connected');
+    } catch {
+      setConnectionStatus('not_connected');
+    }
+  }, [addr]);
+
+  const loadStoredContacts = useCallback(async () => {
+    if (!addr) return;
+
+    setSyncStatus('loading');
+    try {
+      const response = await fetch(
+        `/api/calendar/google/sync-contacts?wallet_address=${addr}`
+      );
+      const data = await response.json();
+
+      if (data.success && data.contacts) {
+        setStoredContacts(data.contacts);
+        setFilteredContacts(data.contacts);
+      }
+    } catch (error) {
+      console.error('Error loading contacts:', error);
+    } finally {
+      setSyncStatus('idle');
+    }
+  }, [addr]);
+
   // Check connection and load contacts on mount
   useEffect(() => {
     if (addr) {
       checkConnection();
       loadStoredContacts();
     }
-  }, [addr]);
+  }, [addr, checkConnection, loadStoredContacts]);
 
   // Filter contacts when search query changes
   useEffect(() => {
@@ -92,41 +128,6 @@ export default function TestContactsPage() {
     return pages;
   };
 
-  const checkConnection = async () => {
-    if (!addr) {
-      setConnectionStatus('not_connected');
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/calendar/status?wallet_address=${addr}`);
-      const data = await response.json();
-      setConnectionStatus(data.connected ? 'connected' : 'not_connected');
-    } catch (error) {
-      setConnectionStatus('not_connected');
-    }
-  };
-
-  const loadStoredContacts = async () => {
-    if (!addr) return;
-
-    setSyncStatus('loading');
-    try {
-      const response = await fetch(
-        `/api/calendar/google/sync-contacts?wallet_address=${addr}`
-      );
-      const data = await response.json();
-
-      if (data.success && data.contacts) {
-        setStoredContacts(data.contacts);
-        setFilteredContacts(data.contacts);
-      }
-    } catch (error) {
-      console.error('Error loading contacts:', error);
-    } finally {
-      setSyncStatus('idle');
-    }
-  };
 
   const syncGmailContacts = async () => {
     if (!addr) return;
@@ -469,7 +470,7 @@ export default function TestContactsPage() {
           <div className="bg-gray-800 rounded-lg p-12 text-center">
             <p className="text-gray-400 mb-4">No contacts synced yet</p>
             <p className="text-gray-500 text-sm">
-              Click "Sync Contacts from Gmail" to extract email addresses from your Gmail
+              Click &quot;Sync Contacts from Gmail&quot; to extract email addresses from your Gmail
             </p>
           </div>
         )}

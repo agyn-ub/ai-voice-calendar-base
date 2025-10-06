@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { google, calendar_v3 } from 'googleapis';
 import { accountsDb } from '@/lib/db/accountsDb';
 
 export class GoogleCalendarService {
@@ -101,7 +101,7 @@ export class GoogleCalendarService {
     }
   }
   
-  async createCalendarEvent(walletAddress: string, event: any) {
+  async createCalendarEvent(walletAddress: string, event: calendar_v3.Schema$Event) {
     const accessToken = await this.getValidToken(walletAddress);
     
     if (!accessToken) {
@@ -129,7 +129,7 @@ export class GoogleCalendarService {
     }
   }
   
-  async updateCalendarEvent(walletAddress: string, eventId: string, event: any) {
+  async updateCalendarEvent(walletAddress: string, eventId: string, event: Partial<calendar_v3.Schema$Event>) {
     const accessToken = await this.getValidToken(walletAddress);
     
     if (!accessToken) {

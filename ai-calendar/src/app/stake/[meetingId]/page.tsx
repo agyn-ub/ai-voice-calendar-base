@@ -1,11 +1,10 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { MeetingStakeData } from '@/lib/services/stakingService';
 import { WalletAuth } from '@/components/WalletAuth';
-import { formatEther } from 'viem';
 import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
 
 export default function StakePage() {
@@ -26,12 +25,7 @@ export default function StakePage() {
     }
   }, []);
 
-  // Fetch meeting information
-  useEffect(() => {
-    fetchMeetingInfo();
-  }, [meetingId, walletAddress]);
-
-  const fetchMeetingInfo = async () => {
+  const fetchMeetingInfo = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/staking/status?meetingId=${meetingId}`);
@@ -46,7 +40,7 @@ export default function StakePage() {
       // Check if current user has already staked
       if (walletAddress) {
         const userStake = data.meeting.stakes.find(
-          (s: any) => s.walletAddress.toLowerCase() === walletAddress.toLowerCase()
+          (s: { walletAddress: string }) => s.walletAddress.toLowerCase() === walletAddress.toLowerCase()
         );
         setHasStaked(!!userStake);
       }
@@ -56,7 +50,12 @@ export default function StakePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [meetingId, walletAddress]);
+
+  // Fetch meeting information
+  useEffect(() => {
+    fetchMeetingInfo();
+  }, [fetchMeetingInfo, walletAddress]);
 
   const handleStake = async () => {
     if (!walletAddress || !meetingInfo || !contractInstance) return;
@@ -68,7 +67,7 @@ export default function StakePage() {
       // First stake on blockchain
       const receipt = await contractInstance.stakeForMeeting(
         meetingId,
-        meetingInfo.stakeAmount.toString()
+        meetingInfo.requiredStake.toString()
       );
 
       // Then record in database
@@ -152,13 +151,8 @@ export default function StakePage() {
               <div className="space-y-6">
                 <div>
                   <h2 className="text-2xl font-semibold mb-4">
-                    {meetingInfo.title}
+                    Meeting {meetingInfo.meetingId}
                   </h2>
-                  {meetingInfo.description && (
-                    <p className="text-gray-300 mb-4">
-                      {meetingInfo.description}
-                    </p>
-                  )}
                 </div>
 
                 {/* Meeting Info Grid */}
@@ -180,16 +174,11 @@ export default function StakePage() {
                       minutes
                     </p>
                   </div>
-                  {meetingInfo.location && (
-                    <div className="bg-gray-900 p-4 rounded-lg">
-                      <p className="text-sm text-gray-400 mb-1">Location</p>
-                      <p className="font-semibold">{meetingInfo.location}</p>
-                    </div>
-                  )}
+                  {/* Location field removed - not in MeetingStakeData */}
                   <div className="bg-gray-900 p-4 rounded-lg">
                     <p className="text-sm text-gray-400 mb-1">Organizer</p>
                     <p className="font-semibold">
-                      {meetingInfo.organizerEmail}
+                      {meetingInfo.organizer}
                     </p>
                   </div>
                 </div>
@@ -201,7 +190,7 @@ export default function StakePage() {
                     <div className="text-right">
                       <p className="text-sm text-gray-300">Required Stake</p>
                       <p className="text-2xl font-bold">
-                        {meetingInfo.stakeAmount} ETH
+                        {meetingInfo.requiredStake} ETH
                       </p>
                     </div>
                   </div>
@@ -270,7 +259,7 @@ export default function StakePage() {
                     >
                       {staking
                         ? 'Processing...'
-                        : `Stake ${meetingInfo.stakeAmount} ETH`}
+                        : `Stake ${meetingInfo.requiredStake} ETH`}
                     </button>
                     <p className="text-xs text-gray-400 text-center">
                       By staking, you commit to attending this meeting. Your

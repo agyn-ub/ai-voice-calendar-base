@@ -115,9 +115,6 @@ export async function runMigrationIfNeeded(): Promise<void> {
 
   // Check if JSON file exists and SQLite is empty
   if (existsSync(jsonPath)) {
-    // Check if we have any accounts in SQLite
-    const testAccount = accountsDb.getAccountByWalletSync('test-check');
-
     // If SQLite seems empty (this test returns null as expected), run migration
     console.log('[Migration] JSON file found. Checking if migration is needed...');
 
@@ -138,7 +135,7 @@ export async function runMigrationIfNeeded(): Promise<void> {
           console.log('[Migration] Data already exists in SQLite. Skipping migration.');
         }
       }
-    } catch (error) {
+    } catch {
       console.log('[Migration] Could not read JSON file, skipping migration');
     }
   }

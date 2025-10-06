@@ -129,8 +129,15 @@ Be concise and helpful in your responses.`;
       const assistantMessage = response.choices[0].message;
       const toolCalls = assistantMessage.tool_calls;
 
-      const actionsExecuted: any[] = [];
-      const toolResponses: any[] = [];
+      const actionsExecuted: Array<{
+        type: string;
+        status: 'success' | 'error';
+        details: unknown;
+      }> = [];
+      const toolResponses: Array<{
+        tool_call_id: string;
+        content: string;
+      }> = [];
       let events: calendar_v3.Schema$Event[] = [];
 
       if (toolCalls && toolCalls.length > 0) {
@@ -219,7 +226,7 @@ Be concise and helpful in your responses.`;
               pendingEvent = parsed.pendingEvent;
               console.log('[OpenAI] Stake flow needed with', parsed.pendingEvent?.stakeRequired, 'FLOW');
             }
-          } catch (e) {
+          } catch {
             // Ignore parse errors for non-disambiguation responses
           }
         }
@@ -251,9 +258,9 @@ Be concise and helpful in your responses.`;
 
   private async executeToolCall(
     functionName: string,
-    args: any,
+    args: Record<string, unknown>,
     walletAddress: string
-  ): Promise<any> {
+  ): Promise<calendar_v3.Schema$Event[] | calendar_v3.Schema$Event | { error: string } | unknown> {
     switch (functionName) {
       case 'get_calendar_events':
         return await this.getCalendarEvents(walletAddress, args);
@@ -275,7 +282,11 @@ Be concise and helpful in your responses.`;
     }
   }
 
-  private async getCalendarEvents(walletAddress: string, args: any) {
+  private async getCalendarEvents(walletAddress: string, args: {
+    timeMin?: string;
+    timeMax?: string;
+    maxResults?: number;
+  }) {
     const { timeMin, timeMax, maxResults = 50 } = args;
 
     const events = await googleCalendarService.getCalendarEvents(
@@ -287,7 +298,21 @@ Be concise and helpful in your responses.`;
     return events.slice(0, maxResults);
   }
 
-  private async createCalendarEvent(walletAddress: string, args: any) {
+  private async createCalendarEvent(walletAddress: string, args: {
+    summary: string;
+    description?: string;
+    location?: string;
+    startDate: string;
+    startHour: number;
+    startMinute: number;
+    startPeriod: 'AM' | 'PM' | 'NONE';
+    durationMinutes?: number;
+    attendeeEmails?: string[];
+    reminderMinutes?: number;
+    isAllDay?: boolean;
+    recurrence?: string;
+    stakeRequired?: number;
+  }) {
     const {
       summary,
       description,
@@ -450,7 +475,7 @@ Be concise and helpful in your responses.`;
             reminderMinutes: reminderMinutes,
             recurrence: recurrence,
             stakeRequired: effectiveStakeAmount,
-            resolvedAttendees: event.attendees.map((a: any) => a.email)
+            resolvedAttendees: event.attendees.map((a: { email: string }) => a.email)
           },
           needsStakeFlow: true
         };
@@ -461,7 +486,15 @@ Be concise and helpful in your responses.`;
     return await googleCalendarService.createCalendarEvent(walletAddress, event);
   }
 
-  private async updateCalendarEvent(walletAddress: string, args: any) {
+  private async updateCalendarEvent(walletAddress: string, args: {
+    eventId: string;
+    summary?: string;
+    description?: string;
+    location?: string;
+    startDateTime?: string;
+    endDateTime?: string;
+    attendeeEmails?: string[];
+  }) {
     const { eventId, ...updateFields } = args;
 
     const event: Partial<CalendarEventInput> = {};
@@ -511,12 +544,18 @@ Be concise and helpful in your responses.`;
     return await googleCalendarService.updateCalendarEvent(walletAddress, eventId, event);
   }
 
-  private async deleteCalendarEvent(walletAddress: string, args: any) {
+  private async deleteCalendarEvent(walletAddress: string, args: {
+    eventId: string;
+  }) {
     const { eventId } = args;
     return await googleCalendarService.deleteCalendarEvent(walletAddress, eventId);
   }
 
-  private async searchCalendarEvents(walletAddress: string, args: any) {
+  private async searchCalendarEvents(walletAddress: string, args: {
+    query: string;
+    timeMin?: string;
+    timeMax?: string;
+  }) {
     const { query, timeMin, timeMax } = args;
 
     const events = await googleCalendarService.getCalendarEvents(
@@ -526,7 +565,7 @@ Be concise and helpful in your responses.`;
     );
 
     const searchLower = query.toLowerCase();
-    return events.filter((event: any) => {
+    return events.filter((event: calendar_v3.Schema$Event) => {
       const summary = event.summary?.toLowerCase() || '';
       const description = event.description?.toLowerCase() || '';
       const location = event.location?.toLowerCase() || '';

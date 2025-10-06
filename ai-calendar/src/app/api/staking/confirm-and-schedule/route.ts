@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pendingMeetingsDb, PendingEventData } from '@/lib/db/pendingMeetings';
-import { GoogleCalendarService } from '@/lib/services/googleCalendar';
+import { googleCalendarService } from '@/lib/services/googleCalendar';
 import { GmailNotificationService } from '@/lib/services/gmailNotificationService';
 import { accountsDb } from '@/lib/db/accountsDb';
 
@@ -54,12 +54,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create Google Calendar service
-    const calendarService = new GoogleCalendarService(
-      organizerAccount.access_token!,
-      organizerAccount.refresh_token!,
-      pendingMeeting.organizer_wallet
-    );
+    // Use the Google Calendar service singleton
+    const calendarService = googleCalendarService;
 
     // Prepare calendar event
     const calendarEvent = {
@@ -88,7 +84,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Create the calendar event with email notifications
-    const createdEvent = await calendarService.createEvent(calendarEvent, true); // true = send invitations
+    const createdEvent = await calendarService.createCalendarEvent(pendingMeeting.organizer_wallet, calendarEvent);
 
     if (!createdEvent || !createdEvent.id) {
       throw new Error('Failed to create calendar event');

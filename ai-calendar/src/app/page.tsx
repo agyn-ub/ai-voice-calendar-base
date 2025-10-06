@@ -8,11 +8,10 @@ import CalendarView from '@/components/CalendarView';
 import { WalletAuth } from '@/components/WalletAuth';
 import { useAccount } from 'wagmi';
 import { CreateMeetingModal } from '@/components/CreateMeetingModal';
-import { VoiceCalendarInterface } from '@/components/VoiceCalendarInterface';
 import { UnifiedCalendarChat } from '@/components/UnifiedCalendarChat';
 
 export default function Home() {
-  const { address: walletAddress, isConnected } = useAccount();
+  const { address: walletAddress } = useAccount();
   const [calendarUpdateTrigger, setCalendarUpdateTrigger] = useState(0);
   const [showWalletDetails, setShowWalletDetails] = useState(false);
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
@@ -168,18 +167,29 @@ export default function Home() {
                   <div>
                     <h2 className="text-2xl font-bold mb-2">Connect Your Wallet</h2>
                     <p className="text-gray-400">
-                      Connect your Flow wallet to access your AI Calendar
+                      Connect your Base wallet to access your AI Calendar
                     </p>
                   </div>
-                  <button
-                    onClick={logIn}
-                    disabled={loading}
-                    className="w-full px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-semibold rounded-lg transition-all disabled:opacity-50 shadow-lg hover:shadow-xl"
-                  >
-                    {loading ? 'Connecting...' : 'Connect Flow Wallet'}
-                  </button>
+                  <div className="flex flex-col items-center gap-4">
+                    <p className="text-sm text-gray-300">
+                      Click the Connect Wallet button in the header to get started
+                    </p>
+                    <svg
+                      className="w-8 h-8 text-gray-500 animate-bounce"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 10l7-7m0 0l7 7m-7-7v18"
+                      />
+                    </svg>
+                  </div>
                   <p className="text-xs text-gray-500">
-                    Supports Blocto, Lilico, and other Flow-compatible wallets
+                    Supports MetaMask, Coinbase Wallet, and other EVM-compatible wallets
                   </p>
                 </div>
               </div>

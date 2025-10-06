@@ -18,12 +18,10 @@ interface Message {
 }
 
 export function UnifiedCalendarChat() {
-  const { address: walletAddress, isConnected } = useAccount();
+  const { address: walletAddress } = useAccount();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [ethBalance, setEthBalance] = useState<string>("0.0");
   const [conversationId, setConversationId] = useState<string | undefined>();
-  const [pendingEventData, setPendingEventData] = useState<PendingEvent | undefined>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -212,7 +210,7 @@ export function UnifiedCalendarChat() {
     }
   };
 
-  const handleContactSelection = async (email: string, name: string) => {
+  const handleContactSelection = async (email: string) => {
     // Send a follow-up message with just the email address to avoid re-disambiguation
     const resolvedMessage = `Please use email ${email} for the meeting`;
     await handleMessage(resolvedMessage);
@@ -269,7 +267,7 @@ export function UnifiedCalendarChat() {
                   className="text-left p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-700"
                 >
                   <p className="text-sm text-gray-700 dark:text-gray-300">
-                    "Team meeting tomorrow 3pm, stake 10 FLOW"
+                    &quot;Team meeting tomorrow 3pm, stake 10 FLOW&quot;
                   </p>
                 </button>
                 <button
@@ -277,7 +275,7 @@ export function UnifiedCalendarChat() {
                   className="text-left p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-700"
                 >
                   <p className="text-sm text-gray-700 dark:text-gray-300">
-                    "Meeting with Sarah Friday 2pm, stake 20 FLOW"
+                    &quot;Meeting with Sarah Friday 2pm, stake 20 FLOW&quot;
                   </p>
                 </button>
               </div>
@@ -315,7 +313,7 @@ export function UnifiedCalendarChat() {
                 <div className="space-y-2">
                   {message.ambiguousContacts.map((ambiguous) => (
                     <div key={ambiguous.searchQuery} className="space-y-1">
-                      <p className="text-xs text-gray-500 dark:text-gray-500">For "{ambiguous.searchQuery}":</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500">For &quot;{ambiguous.searchQuery}&quot;:</p>
                       {ambiguous.matches.map((match, idx) => (
                         <button
                           key={`${match.email}-${idx}`}

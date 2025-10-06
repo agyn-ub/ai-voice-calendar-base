@@ -1,5 +1,4 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
 import crypto from 'crypto';
 
 const DB_FILE = process.env.DATABASE_PATH || './calendar-connections.json';

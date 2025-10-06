@@ -1,6 +1,27 @@
 "use client";
 
-import { useState, useEffect, useRef, KeyboardEvent } from "react";
+import { useState, useEffect, useRef, KeyboardEvent, useCallback } from "react";
+
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: () => void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+  onend: () => void;
+  start: () => void;
+  stop: () => void;
+}
 
 interface UnifiedChatInputProps {
   onSendMessage: (message: string) => void;
@@ -19,12 +40,12 @@ export function UnifiedChatInput({
   const [isRecording, setIsRecording] = useState(false);
   const [isVoiceSupported, setIsVoiceSupported] = useState(false);
   const [showTools, setShowTools] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Check for speech recognition support
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition = (window as Window & { SpeechRecognition?: new() => SpeechRecognitionInstance; webkitSpeechRecognition?: new() => SpeechRecognitionInstance }).SpeechRecognition || (window as Window & { SpeechRecognition?: new() => SpeechRecognitionInstance; webkitSpeechRecognition?: new() => SpeechRecognitionInstance }).webkitSpeechRecognition;
 
     if (SpeechRecognition) {
       setIsVoiceSupported(true);
@@ -38,7 +59,7 @@ export function UnifiedChatInput({
         setIsRecording(true);
       };
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         let finalTranscript = '';
         let interimTranscript = '';
 
@@ -64,7 +85,7 @@ export function UnifiedChatInput({
         }
       };
 
-      recognition.onerror = (event: any) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setIsRecording(false);
       };
@@ -81,22 +102,23 @@ export function UnifiedChatInput({
         recognitionRef.current.stop();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     if (inputValue.trim() && !disabled) {
       onSendMessage(inputValue.trim());
       setInputValue("");
       inputRef.current?.focus();
     }
-  };
+  }, [inputValue, disabled, onSendMessage]);
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  };
+  }, [handleSend]);
 
   const toggleRecording = () => {
     if (!isVoiceSupported || disabled) return;

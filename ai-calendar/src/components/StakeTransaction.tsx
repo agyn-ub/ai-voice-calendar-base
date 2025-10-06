@@ -44,12 +44,13 @@ export function StakeTransaction({
     },
   ];
 
-  const handleError = (error: Error) => {
+  const handleError = (e: { name?: string; message?: string }) => {
+    const error = new Error(e.message || 'Transaction failed');
     console.error('Transaction error:', error);
     onError?.(error);
   };
 
-  const handleSuccess = (response: any) => {
+  const handleSuccess = (response: { transactionReceipts?: Array<{ transactionHash: string }> }) => {
     console.log('Transaction success:', response);
     if (response?.transactionReceipts?.[0]?.transactionHash) {
       onSuccess?.(response.transactionReceipts[0].transactionHash);
@@ -58,7 +59,7 @@ export function StakeTransaction({
 
   return (
     <Transaction
-      contracts={contracts}
+      calls={contracts}
       onError={handleError}
       onSuccess={handleSuccess}
       className="w-full"

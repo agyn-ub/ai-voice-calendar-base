@@ -1,4 +1,4 @@
-import initSqlJs, { Database, Statement } from 'sql.js';
+import initSqlJs, { Database } from 'sql.js';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -230,9 +230,9 @@ class SqliteDatabase {
 
   // Prepared statement wrapper for sql.js
   public async prepare(sql: string): Promise<{
-    run: (params: any) => { changes: number; lastInsertRowid: number };
-    get: (params: any) => any;
-    all: (params: any) => any[];
+    run: (params: unknown[] | Record<string, unknown> | undefined) => { changes: number; lastInsertRowid: number };
+    get: (params: unknown[] | Record<string, unknown> | undefined) => Record<string, unknown> | undefined;
+    all: (params: unknown[] | Record<string, unknown> | undefined) => Record<string, unknown>[];
   }> {
     await this.ensureInitialized();
     if (!this.db) throw new Error('Database not initialized');
@@ -241,11 +241,11 @@ class SqliteDatabase {
     const saveToFile = () => this.saveToFile();
 
     return {
-      run: (params: any) => {
+      run: (params: unknown[] | Record<string, unknown> | undefined) => {
         const stmt = db.prepare(sql);
 
         // Convert object params to array if necessary
-        let paramArray: any[];
+        let paramArray: unknown[];
         if (Array.isArray(params)) {
           paramArray = params;
         } else if (params && typeof params === 'object') {
@@ -272,11 +272,11 @@ class SqliteDatabase {
           lastInsertRowid: db.exec('SELECT last_insert_rowid()')[0]?.values[0]?.[0] || 0
         };
       },
-      get: (params: any) => {
+      get: (params: unknown[] | Record<string, unknown> | undefined) => {
         const stmt = db.prepare(sql);
 
         // Convert params similar to run()
-        let paramArray: any[];
+        let paramArray: unknown[];
         if (Array.isArray(params)) {
           paramArray = params;
         } else if (params && typeof params === 'object') {
@@ -300,11 +300,11 @@ class SqliteDatabase {
         stmt.free();
         return undefined;
       },
-      all: (params: any) => {
+      all: (params: unknown[] | Record<string, unknown> | undefined) => {
         const stmt = db.prepare(sql);
 
         // Convert params similar to run()
-        let paramArray: any[];
+        let paramArray: unknown[];
         if (Array.isArray(params)) {
           paramArray = params;
         } else if (params && typeof params === 'object') {

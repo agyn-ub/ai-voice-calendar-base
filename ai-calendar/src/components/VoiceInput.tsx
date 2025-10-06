@@ -1,6 +1,27 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: () => void;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+  onend: () => void;
+  start: () => void;
+  stop: () => void;
+}
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -12,11 +33,11 @@ export function VoiceInput({ onTranscript, onStateChange, className = "" }: Voic
   const [isRecording, setIsRecording] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   useEffect(() => {
     // Check if browser supports speech recognition
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition = (window as Window & { SpeechRecognition?: new() => SpeechRecognitionInstance; webkitSpeechRecognition?: new() => SpeechRecognitionInstance }).SpeechRecognition || (window as Window & { SpeechRecognition?: new() => SpeechRecognitionInstance; webkitSpeechRecognition?: new() => SpeechRecognitionInstance }).webkitSpeechRecognition;
 
     if (SpeechRecognition) {
       setIsSupported(true);
@@ -32,7 +53,7 @@ export function VoiceInput({ onTranscript, onStateChange, className = "" }: Voic
         setTranscript("");
       };
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         let finalTranscript = '';
         let interimTranscript = '';
 
@@ -53,7 +74,7 @@ export function VoiceInput({ onTranscript, onStateChange, className = "" }: Voic
         }
       };
 
-      recognition.onerror = (event: any) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setIsRecording(false);
         onStateChange?.(false);
@@ -84,25 +105,25 @@ export function VoiceInput({ onTranscript, onStateChange, className = "" }: Voic
     };
   }, [onTranscript, onStateChange]);
 
-  const startRecording = () => {
+  const startRecording = useCallback(() => {
     if (recognitionRef.current && !isRecording) {
       recognitionRef.current.start();
     }
-  };
+  }, [isRecording]);
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     if (recognitionRef.current && isRecording) {
       recognitionRef.current.stop();
     }
-  };
+  }, [isRecording]);
 
-  const toggleRecording = () => {
+  const toggleRecording = useCallback(() => {
     if (isRecording) {
       stopRecording();
     } else {
       startRecording();
     }
-  };
+  }, [isRecording, startRecording, stopRecording]);
 
   // Handle spacebar for push-to-talk
   useEffect(() => {
@@ -141,7 +162,7 @@ export function VoiceInput({ onTranscript, onStateChange, className = "" }: Voic
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isRecording, isSupported]);
+  }, [isRecording, isSupported, startRecording, stopRecording]);
 
   if (!isSupported) {
     return (

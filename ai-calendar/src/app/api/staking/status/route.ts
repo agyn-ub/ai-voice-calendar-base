@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { StakingService } from '@/lib/services/stakingService';
 import { db } from '@/lib/db';
 
 export async function GET(request: NextRequest) {

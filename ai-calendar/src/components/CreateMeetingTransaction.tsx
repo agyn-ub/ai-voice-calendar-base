@@ -42,7 +42,8 @@ export function CreateMeetingTransaction({
     );
   }
 
-  const contracts = [
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contracts: any = [
     {
       address: contractAddress as `0x${string}`,
       abi: MeetingStakeABI,
@@ -57,12 +58,13 @@ export function CreateMeetingTransaction({
     },
   ];
 
-  const handleError = (error: Error) => {
+  const handleError = (e: { name?: string; message?: string }) => {
+    const error = new Error(e.message || 'Transaction failed');
     console.error('Transaction error:', error);
     onError?.(error);
   };
 
-  const handleSuccess = (response: any) => {
+  const handleSuccess = (response: { transactionReceipts?: Array<{ transactionHash: string }> }) => {
     console.log('Transaction success:', response);
     if (response?.transactionReceipts?.[0]?.transactionHash) {
       onSuccess?.(response.transactionReceipts[0].transactionHash);
@@ -71,7 +73,7 @@ export function CreateMeetingTransaction({
 
   return (
     <Transaction
-      contracts={contracts}
+      calls={contracts}
       onError={handleError}
       onSuccess={handleSuccess}
       className="w-full"

@@ -77,8 +77,6 @@ export function CreateMeetingModal({
       // If staking is enabled, create blockchain meeting
       if (stakingEnabled) {
         const meetingId = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const startTimestamp = startDateTime.getTime() / 1000; // Convert to seconds
-        const endTimestamp = endDateTime.getTime() / 1000;
 
         // Note: Blockchain meeting creation will be handled when users stake
         // through the smart contract interface

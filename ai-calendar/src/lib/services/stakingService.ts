@@ -91,7 +91,7 @@ export class StakingService {
   /**
    * Generate attendance code (for meeting organizer)
    */
-  static async generateAttendanceCode(meetingId: string, organizerAddress: string): Promise<string> {
+  static async generateAttendanceCode(meetingId: string): Promise<string> {
     try {
       // Generate a random 6-character code
       const code = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -242,7 +242,7 @@ export class StakingService {
     const stakes: MeetingStakeData[] = [];
 
     if (allData.meetingStakes) {
-      Object.values(allData.meetingStakes).forEach((meeting: any) => {
+      Object.values(allData.meetingStakes).forEach((meeting: MeetingStakeData) => {
         const hasStake = meeting.stakes.some((s: StakeRecord) => s.walletAddress === walletAddress);
         if (hasStake || meeting.organizer === walletAddress) {
           stakes.push(meeting);

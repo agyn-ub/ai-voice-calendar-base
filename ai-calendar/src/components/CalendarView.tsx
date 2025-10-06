@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface CalendarEvent {
   id: string;
@@ -31,12 +31,44 @@ export default function CalendarView({ walletAddress, refreshTrigger }: Calendar
   const [loading, setLoading] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
-  // Fetch events when component mounts or refreshTrigger changes
-  useEffect(() => {
-    fetchEvents();
-  }, [walletAddress, currentDate, refreshTrigger]);
+  const getStartDate = useCallback(() => {
+    if (viewMode === 'month') {
+      const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      // Get the Sunday before the first day of the month
+      const day = start.getDay();
+      start.setDate(start.getDate() - day);
+      return start;
+    } else {
+      // Week view - start from Sunday of current week
+      const start = new Date(currentDate);
+      const day = start.getDay();
+      start.setDate(start.getDate() - day);
+      start.setHours(0, 0, 0, 0);
+      return start;
+    }
+  }, [viewMode, currentDate]);
 
-  const fetchEvents = async () => {
+  const getEndDate = useCallback(() => {
+    if (viewMode === 'month') {
+      const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      // Get the Saturday after the last day of the month
+      const day = end.getDay();
+      if (day < 6) {
+        end.setDate(end.getDate() + (6 - day));
+      }
+      end.setHours(23, 59, 59, 999);
+      return end;
+    } else {
+      // Week view - end on Saturday
+      const end = new Date(currentDate);
+      const day = end.getDay();
+      end.setDate(end.getDate() + (6 - day));
+      end.setHours(23, 59, 59, 999);
+      return end;
+    }
+  }, [viewMode, currentDate]);
+
+  const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
       // Calculate date range based on view mode
@@ -61,44 +93,12 @@ export default function CalendarView({ walletAddress, refreshTrigger }: Calendar
     } finally {
       setLoading(false);
     }
-  };
+  }, [walletAddress, getStartDate, getEndDate]);
 
-  const getStartDate = () => {
-    if (viewMode === 'month') {
-      const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      // Get the Sunday before the first day of the month
-      const day = start.getDay();
-      start.setDate(start.getDate() - day);
-      return start;
-    } else {
-      // Week view - start from Sunday of current week
-      const start = new Date(currentDate);
-      const day = start.getDay();
-      start.setDate(start.getDate() - day);
-      start.setHours(0, 0, 0, 0);
-      return start;
-    }
-  };
-
-  const getEndDate = () => {
-    if (viewMode === 'month') {
-      const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-      // Get the Saturday after the last day of the month
-      const day = end.getDay();
-      if (day < 6) {
-        end.setDate(end.getDate() + (6 - day));
-      }
-      end.setHours(23, 59, 59, 999);
-      return end;
-    } else {
-      // Week view - end on Saturday
-      const end = new Date(currentDate);
-      const day = end.getDay();
-      end.setDate(end.getDate() + (6 - day));
-      end.setHours(23, 59, 59, 999);
-      return end;
-    }
-  };
+  // Fetch events when component mounts or refreshTrigger changes
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents, refreshTrigger]);
 
   const navigatePrevious = () => {
     if (viewMode === 'month') {

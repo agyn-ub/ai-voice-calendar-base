@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface GoogleCalendarConnectProps {
   walletAddress: string;
@@ -31,37 +31,7 @@ export default function GoogleCalendarConnect({ walletAddress }: GoogleCalendarC
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
 
-  useEffect(() => {
-    checkConnectionStatus();
-    
-    // Listen for messages from the OAuth popup
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      
-      if (event.data?.type === 'calendar-auth-complete') {
-        setConnecting(false);
-        if (event.data.success) {
-          // Refresh status after successful connection
-          setTimeout(() => {
-            checkConnectionStatus();
-          }, 500);
-        } else {
-          console.error('Calendar connection failed:', event.data.message);
-        }
-      }
-    };
-    
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [walletAddress]);
-
-  useEffect(() => {
-    if (status.connected) {
-      fetchCalendarEvents();
-    }
-  }, [status.connected]);
-
-  const checkConnectionStatus = async () => {
+  const checkConnectionStatus = useCallback(async () => {
     try {
       const response = await fetch(`/api/calendar/status?wallet_address=${walletAddress}`);
       const data = await response.json();
@@ -71,7 +41,7 @@ export default function GoogleCalendarConnect({ walletAddress }: GoogleCalendarC
     } finally {
       setLoading(false);
     }
-  };
+  }, [walletAddress]);
 
   const connectCalendar = async () => {
     setConnecting(true);
@@ -124,7 +94,7 @@ export default function GoogleCalendarConnect({ walletAddress }: GoogleCalendarC
     }
   };
 
-  const fetchCalendarEvents = async () => {
+  const fetchCalendarEvents = useCallback(async () => {
     setLoadingEvents(true);
     try {
       const response = await fetch(`/api/calendar/google/events?wallet_address=${walletAddress}`);
@@ -138,7 +108,37 @@ export default function GoogleCalendarConnect({ walletAddress }: GoogleCalendarC
     } finally {
       setLoadingEvents(false);
     }
-  };
+  }, [walletAddress]);
+
+  useEffect(() => {
+    checkConnectionStatus();
+    
+    // Listen for messages from the OAuth popup
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data?.type === 'calendar-auth-complete') {
+        setConnecting(false);
+        if (event.data.success) {
+          // Refresh status after successful connection
+          setTimeout(() => {
+            checkConnectionStatus();
+          }, 500);
+        } else {
+          console.error('Calendar connection failed:', event.data.message);
+        }
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [walletAddress, checkConnectionStatus]);
+
+  useEffect(() => {
+    if (status.connected) {
+      fetchCalendarEvents();
+    }
+  }, [status.connected, fetchCalendarEvents]);
 
   const formatEventTime = (event: CalendarEvent) => {
     const startDate = event.start.dateTime || event.start.date;

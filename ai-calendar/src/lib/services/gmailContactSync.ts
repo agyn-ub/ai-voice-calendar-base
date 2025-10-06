@@ -1,6 +1,5 @@
 import { google, gmail_v1 } from 'googleapis';
 import { accountsDb } from '@/lib/db/accountsDb';
-import { contactsDb } from '@/lib/db/contactsDb';
 
 export class GmailContactSyncService {
   private gmail: gmail_v1.Gmail;
@@ -100,9 +99,10 @@ export class GmailContactSyncService {
                   format: 'METADATA',
                   metadataHeaders: ['From', 'To', 'Cc', 'Bcc'],
                 });
-              } catch (err: any) {
+              } catch (err: unknown) {
                 // Check if it's a rate limit error
-                if (err?.code === 429 || err?.message?.includes('quota') || err?.message?.includes('limit')) {
+                const error = err as { code?: number; message?: string };
+                if (error?.code === 429 || error?.message?.includes('quota') || error?.message?.includes('limit')) {
                   retries++;
                   rateLimitErrors++;
 

@@ -136,7 +136,7 @@ export class CalendarAssistantService {
   }
   
   // Helper method to format events for display
-  formatEventsForDisplay(events: any[]): string {
+  formatEventsForDisplay(events: Array<{ summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string }; attendees?: Array<{ email: string }> }>): string {
     if (!events || events.length === 0) {
       return 'No events found.';
     }

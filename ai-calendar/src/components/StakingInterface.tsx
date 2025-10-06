@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { formatEther } from 'viem';
 import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
@@ -20,7 +20,6 @@ interface StakingInterfaceProps {
 export default function StakingInterface({
   meetingId,
   eventId,
-  eventTitle,
   startTime,
   endTime,
   requiredStake,
@@ -28,7 +27,25 @@ export default function StakingInterface({
   onStakeComplete
 }: StakingInterfaceProps) {
   const { address: walletAddress, isConnected } = useAccount();
-  const [stakeStatus, setStakeStatus] = useState<any>(null);
+  const [stakeStatus, setStakeStatus] = useState<{
+    meeting: {
+      status: string;
+      requiredStake: string;
+      hasAttendanceCode: boolean;
+    } & Meeting;
+    userStake: {
+      amount: string;
+      hasCheckedIn: boolean;
+      isRefunded: boolean;
+    } | null;
+    stats: {
+      totalStaked: string;
+      totalStakers: number;
+      totalAttended: number;
+      totalAbsent: number;
+    };
+    participants: string[];
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [attendanceCode, setAttendanceCode] = useState('');
   const [inputCode, setInputCode] = useState('');
@@ -44,7 +61,7 @@ export default function StakingInterface({
   }, []);
 
   // Fetch stake status
-  const fetchStakeStatus = async () => {
+  const fetchStakeStatus = useCallback(async () => {
     if (!meetingId || !walletAddress || !contractInstance) return;
     
     setIsRefreshing(true);
@@ -95,7 +112,7 @@ export default function StakingInterface({
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [meetingId, walletAddress, contractInstance]);
 
   useEffect(() => {
     if (contractInstance) {
@@ -104,7 +121,7 @@ export default function StakingInterface({
       const interval = setInterval(fetchStakeStatus, 30000);
       return () => clearInterval(interval);
     }
-  }, [meetingId, walletAddress, contractInstance]);
+  }, [contractInstance, fetchStakeStatus]);
 
   // Create staked meeting
   const createStakedMeeting = async () => {
@@ -125,8 +142,8 @@ export default function StakingInterface({
       toast.success(`Meeting created! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       setSuccess(`Meeting created! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       await fetchStakeStatus();
-    } catch (error: any) {
-      const errorMsg = error?.message || 'Failed to create staking requirement';
+    } catch (error: unknown) {
+      const errorMsg = (error instanceof Error ? error.message : String(error)) || 'Failed to create staking requirement';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Error creating staked meeting:', error);
@@ -152,8 +169,8 @@ export default function StakingInterface({
       setSuccess(`Successfully staked! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       await fetchStakeStatus();
       onStakeComplete?.();
-    } catch (error: any) {
-      const errorMsg = error?.message || 'Failed to stake';
+    } catch (error: unknown) {
+      const errorMsg = (error instanceof Error ? error.message : String(error)) || 'Failed to stake';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Error staking:', error);
@@ -173,7 +190,7 @@ export default function StakingInterface({
       // Generate a random 6-character code
       const code = Math.random().toString(36).substring(2, 8).toUpperCase();
       
-      const receipt = await contractInstance.generateAttendanceCode(
+      await contractInstance.generateAttendanceCode(
         meetingId,
         code
       );
@@ -182,8 +199,8 @@ export default function StakingInterface({
       toast.success('Attendance code generated! Share it with attendees.');
       setSuccess('Attendance code generated! Share it with attendees.');
       await fetchStakeStatus();
-    } catch (error: any) {
-      const errorMsg = error?.message || 'Failed to generate code';
+    } catch (error: unknown) {
+      const errorMsg = (error instanceof Error ? error.message : String(error)) || 'Failed to generate code';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Error generating code:', error);
@@ -200,7 +217,7 @@ export default function StakingInterface({
     setError('');
     
     try {
-      const receipt = await contractInstance.submitAttendanceCode(
+      await contractInstance.submitAttendanceCode(
         meetingId,
         inputCode
       );
@@ -209,8 +226,8 @@ export default function StakingInterface({
       setSuccess('Attendance confirmed! Your stake will be refunded after the meeting.');
       setInputCode('');
       await fetchStakeStatus();
-    } catch (error: any) {
-      const errorMsg = error?.message || 'Failed to submit code';
+    } catch (error: unknown) {
+      const errorMsg = (error instanceof Error ? error.message : String(error)) || 'Failed to submit code';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Error submitting code:', error);
@@ -232,8 +249,8 @@ export default function StakingInterface({
       toast.success(`Meeting settled! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       setSuccess(`Meeting settled! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       await fetchStakeStatus();
-    } catch (error: any) {
-      const errorMsg = error?.message || 'Failed to settle meeting';
+    } catch (error: unknown) {
+      const errorMsg = (error instanceof Error ? error.message : String(error)) || 'Failed to settle meeting';
       setError(errorMsg);
       toast.error(errorMsg);
       console.error('Error settling:', error);
@@ -276,7 +293,6 @@ export default function StakingInterface({
   }
 
   const { meeting, stats, userStake } = stakeStatus;
-  const now = new Date();
   const canStake = meeting.status === 'upcoming' && !userStake;
   const canGenerateCode = isOrganizer && meeting.status === 'in_progress' && !meeting.hasAttendanceCode;
   const canSubmitCode = userStake && !userStake.hasCheckedIn && meeting.hasAttendanceCode && 

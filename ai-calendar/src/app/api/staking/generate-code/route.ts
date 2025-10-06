@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate attendance code
-    const code = await StakingService.generateAttendanceCode(meetingId, walletAddress);
+    const code = await StakingService.generateAttendanceCode(meetingId);
 
     return NextResponse.json({
       success: true,

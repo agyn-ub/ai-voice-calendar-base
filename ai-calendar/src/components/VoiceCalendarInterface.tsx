@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { VoiceInput } from "./VoiceInput";
 import { useFlow } from "./FlowProvider";
 import FlowService from "@/lib/flow/flowService";
-import { formatDateTimeWithTimezone } from "@/lib/utils/timezone";
 import { TypingIndicator } from "./ui/TypingIndicator";
 
 interface Meeting {
@@ -25,14 +24,7 @@ export function VoiceCalendarInterface() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [flowBalance, setFlowBalance] = useState<string>("0.0");
 
-  useEffect(() => {
-    if (user?.addr) {
-      fetchFlowBalance();
-      loadMeetings();
-    }
-  }, [user]);
-
-  const fetchFlowBalance = async () => {
+  const fetchFlowBalance = useCallback(async () => {
     if (!user?.addr) return;
     try {
       const balance = await FlowService.getFlowBalance(user.addr);
@@ -40,9 +32,9 @@ export function VoiceCalendarInterface() {
     } catch (error) {
       console.error("Error fetching balance:", error);
     }
-  };
+  }, [user?.addr]);
 
-  const loadMeetings = async () => {
+  const loadMeetings = useCallback(async () => {
     if (!user?.addr) return;
     try {
       const meetingIds = await FlowService.getUserMeetings(user.addr);
@@ -54,12 +46,19 @@ export function VoiceCalendarInterface() {
         })
       );
       // Filter out null values and map to our Meeting interface
-      const validMeetings = meetingDetails.filter(m => m !== null) as any[];
+      const validMeetings = meetingDetails.filter(m => m !== null) as Meeting[];
       setMeetings(validMeetings);
     } catch (error) {
       console.error("Error loading meetings:", error);
     }
-  };
+  }, [user?.addr]);
+
+  useEffect(() => {
+    if (user?.addr) {
+      fetchFlowBalance();
+      loadMeetings();
+    }
+  }, [user, fetchFlowBalance, loadMeetings]);
 
   const handleVoiceCommand = async (transcript: string) => {
     setProcessing(true);
@@ -197,25 +196,25 @@ export function VoiceCalendarInterface() {
             onClick={() => handleVoiceCommand("Schedule team meeting tomorrow at 3pm with 10 FLOW stake")}
             className="text-left p-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
           >
-            <p className="text-sm text-green-400">"Team meeting tomorrow 3pm, stake 10 FLOW"</p>
+            <p className="text-sm text-green-400">&quot;Team meeting tomorrow 3pm, stake 10 FLOW&quot;</p>
           </button>
           <button
             onClick={() => handleVoiceCommand("Meeting with Sarah Friday 2pm about project review, stake 20 FLOW")}
             className="text-left p-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
           >
-            <p className="text-sm text-green-400">"Meeting with Sarah Friday 2pm, stake 20 FLOW"</p>
+            <p className="text-sm text-green-400">&quot;Meeting with Sarah Friday 2pm, stake 20 FLOW&quot;</p>
           </button>
           <button
             onClick={() => handleVoiceCommand("Daily standup tomorrow 9am with 5 FLOW stake")}
             className="text-left p-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
           >
-            <p className="text-sm text-green-400">"Daily standup tomorrow 9am, stake 5 FLOW"</p>
+            <p className="text-sm text-green-400">&quot;Daily standup tomorrow 9am, stake 5 FLOW&quot;</p>
           </button>
           <button
             onClick={() => handleVoiceCommand("Board meeting next Monday 10am, everyone stakes 50 FLOW")}
             className="text-left p-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
           >
-            <p className="text-sm text-green-400">"Board meeting Monday 10am, stake 50 FLOW"</p>
+            <p className="text-sm text-green-400">&quot;Board meeting Monday 10am, stake 50 FLOW&quot;</p>
           </button>
         </div>
       </div>
