@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import '@coinbase/onchainkit/styles.css';
 import ClientOnly from "@/components/ClientOnly";
-import { WalletProvider } from "@/components/WalletProvider";
+import { OnchainProviders } from "@/components/OnchainProviders";
 import { Toaster } from "react-hot-toast";
 
 const geistSans = Geist({
@@ -31,10 +32,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ClientOnly>
-          <WalletProvider>
+          <OnchainProviders>
             <Toaster position="top-right" />
             {children}
-          </WalletProvider>
+          </OnchainProviders>
         </ClientOnly>
       </body>
     </html>

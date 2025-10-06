@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useFlow } from '@/components/FlowProvider';
+import { useAccount } from 'wagmi';
 import { useRouter } from 'next/navigation';
 
 interface StoredContact {
@@ -24,8 +24,7 @@ interface SyncResult {
 
 export default function TestContactsPage() {
   const router = useRouter();
-  const { user } = useFlow();
-  const addr = user?.addr;
+  const { address: addr, isConnected } = useAccount();
 
   // State
   const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'not_connected'>('checking');
@@ -205,7 +204,7 @@ export default function TestContactsPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto bg-gray-800 rounded-lg p-8 text-center">
           <h1 className="text-2xl font-bold mb-4">Connect Your Wallet</h1>
-          <p className="text-gray-400 mb-6">Please connect your Flow wallet to manage contacts</p>
+          <p className="text-gray-400 mb-6">Please connect your wallet to manage contacts</p>
           <button
             onClick={() => router.push('/')}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"

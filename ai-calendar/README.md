@@ -1,56 +1,57 @@
-# AI Voice Calendar - Built on Flow Blockchain
+# AI Voice Calendar - Built on Base
 
-## 🌊 Built on Flow
+## 🔵 Built on Base
 
-This project is **built on the Flow blockchain**, leveraging Flow's developer-friendly Cadence smart contracts for decentralized meeting staking and accountability mechanics.
+This project is **built on Base**, Coinbase's Layer 2 blockchain, leveraging Ethereum-compatible smart contracts for decentralized meeting staking and accountability mechanics.
 
 ## Project Overview
 
 AI Voice Calendar is a Next.js 15 application that revolutionizes calendar management by combining:
 - 🎯 **Natural language processing** via OpenAI for intuitive calendar interactions
-- ⛓️ **Flow blockchain integration** for meeting staking and accountability
+- ⛓️ **Base blockchain integration** for meeting staking and accountability
 - 📅 **Google Calendar sync** with full CRUD operations
 - 👥 **Smart contact resolution** via local contacts database
-- 💰 **FLOW token staking** on meetings with reward distribution
+- 💰 **ETH staking** on meetings with reward distribution
 
-Users authenticate via Flow wallet, connect their Google Calendar, interact through an AI-powered chat assistant, and can stake FLOW tokens on meetings to ensure accountability.
+Users authenticate via Base wallet (using RainbowKit), connect their Google Calendar, interact through an AI-powered chat assistant, and can stake ETH on meetings to ensure accountability.
 
-## Flow Blockchain Integration
+## Base Blockchain Integration
 
 ### Deployed Contract Addresses
 
-#### Flow Testnet
-- **MeetingStaking Contract**: `0x2c3e84f9de31e3c7`
-- **Network**: Flow Testnet
-- **Access Node**: `https://access-testnet.onflow.org`
+#### Base Sepolia (Testnet)
+- **MeetingStake Contract**: `[To be deployed]`
+- **Network**: Base Sepolia
+- **RPC URL**: `https://sepolia.base.org`
+- **Explorer**: `https://sepolia.basescan.org`
 
-#### Flow Dependencies (Testnet)
-- **FlowToken**: `0x7e60df042a9c0868`
-- **FungibleToken**: `0x9a0766d93b6608b7`
-- **MetadataViews**: `0x631e88ae7f1d7c20`
-- **NonFungibleToken**: `0x631e88ae7f1d7c20`
+#### Base Mainnet
+- **MeetingStake Contract**: `[To be deployed]`
+- **Network**: Base
+- **RPC URL**: `https://mainnet.base.org`
+- **Explorer**: `https://basescan.org`
 
 ### Smart Contract Features
 
-The `MeetingStaking` contract deployed on Flow enables:
+The `MeetingStake` contract deployed on Base enables:
 - **Meeting Creation**: Organizers create meetings with stake requirements
-- **Participant Staking**: Attendees join by staking FLOW tokens
-- **Attendance Tracking**: On-chain verification of meeting attendance
-- **Reward Distribution**: Automatic redistribution of stakes based on attendance
-- **Meeting Manager**: Per-user resource stored in Flow account storage
+- **Participant Staking**: Attendees join by staking ETH
+- **Attendance Tracking**: On-chain verification via attendance codes
+- **Stake Distribution**: Automatic redistribution of stakes based on attendance
+- **Settlement**: Refunds for attendees, forfeiture for no-shows
 
-### Flow Integration Points
+### Base Integration Points
 
-1. **Wallet Authentication**: Flow Client Library (FCL) for wallet connection
-2. **Transaction Execution**: Cadence transactions for meeting operations
-3. **State Queries**: Cadence scripts for reading meeting data
-4. **Token Operations**: FLOW token transfers for staking mechanics
+1. **Wallet Authentication**: RainbowKit for wallet connection (MetaMask, WalletConnect, etc.)
+2. **Transaction Execution**: Ethereum-compatible transactions using wagmi/viem
+3. **State Queries**: Smart contract view functions for reading meeting data
+4. **Staking Operations**: ETH transfers for staking mechanics
 
 ## Tech Stack
 
 - **Frontend**: Next.js 15.5.3 with App Router, React 19.1.0, TypeScript
-- **Blockchain**: Flow blockchain with Cadence smart contracts
-- **Authentication**: Flow wallet via @onflow/fcl
+- **Blockchain**: Base (Layer 2) with Solidity smart contracts
+- **Wallet Integration**: RainbowKit + wagmi + viem
 - **Styling**: Tailwind CSS v4
 - **Calendar**: Google Calendar API
 - **Contacts**: Local SQLite database with Gmail sync
@@ -62,7 +63,7 @@ The `MeetingStaking` contract deployed on Flow enables:
 ### Prerequisites
 
 - Node.js 18+ and pnpm
-- Flow wallet (Blocto, Lilico, or Flow Wallet)
+- Ethereum wallet (MetaMask or WalletConnect-compatible)
 - Google Cloud Console project with Calendar API enabled
 - OpenAI API key
 
@@ -97,16 +98,13 @@ NEXTAUTH_URL=http://localhost:3000
 # OpenAI
 OPENAI_API_KEY=your_openai_api_key
 
-# Flow Blockchain Configuration
-NEXT_PUBLIC_FLOW_NETWORK=testnet
-NEXT_PUBLIC_ACCESS_NODE_API=https://access-testnet.onflow.org
-NEXT_PUBLIC_WALLET_DISCOVERY=https://fcl-discovery.onflow.org/testnet/authn
-NEXT_PUBLIC_APP_IDENTIFIER=ai-voice-calendar
+# Base Blockchain Configuration
+NEXT_PUBLIC_NETWORK=testnet  # "testnet" for Base Sepolia, "mainnet" for Base
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 
-# Flow Contract Addresses (Testnet)
-NEXT_PUBLIC_MEETING_STAKING_ADDRESS=0x2c3e84f9de31e3c7
-NEXT_PUBLIC_FLOW_TOKEN_ADDRESS=0x7e60df042a9c0868
+# Smart Contract Addresses (update after deployment)
+NEXT_PUBLIC_MEETING_STAKE_CONTRACT=0x0000000000000000000000000000000000000000
+NEXT_PUBLIC_MEETING_STAKE_CONTRACT_MAINNET=0x0000000000000000000000000000000000000000
 ```
 
 ### Development
@@ -141,10 +139,10 @@ npx tsc --noEmit
 - Handles mixed input (names and emails)
 - Creates calendar invitations with proper email notifications
 
-### Flow Blockchain Staking
-- Stake FLOW tokens when creating meetings
+### Base Blockchain Staking
+- Stake ETH when creating meetings
 - Participants stake to confirm attendance
-- Automatic reward distribution based on attendance
+- Automatic stake distribution based on attendance
 - On-chain meeting records for transparency
 
 ### AI-Powered Assistant

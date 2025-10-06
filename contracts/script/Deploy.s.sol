@@ -14,9 +14,16 @@ contract DeployScript is Script {
         
         MeetingStake meetingStake = new MeetingStake();
         
+        console.log("====================================");
+        console.log("Base Hackathon Deployment");
+        console.log("====================================");
         console.log("MeetingStake deployed to:", address(meetingStake));
-        console.log("Network: Flow EVM Testnet");
-        console.log("Chain ID: 545");
+        console.log("Network: Base Sepolia Testnet");
+        console.log("Chain ID: 84532");
+        console.log("====================================");
+        console.log("Verify on Basescan:");
+        console.log(string.concat("https://sepolia.basescan.org/address/", vm.toString(address(meetingStake))));
+        console.log("====================================");
         
         vm.stopBroadcast();
     }

@@ -57,7 +57,7 @@ export class GmailNotificationService {
     meetingData: StakeInvitationData
   ): Promise<boolean> {
     try {
-      const subject = `Action Required: Stake ${meetingData.stakeAmount} FLOW for "${meetingData.title}"`;
+      const subject = `Action Required: Stake ${meetingData.stakeAmount} ETH for "${meetingData.title}"`;
 
       // Format date and time
       const dateStr = meetingData.startTime.toLocaleDateString('en-US', {
@@ -123,12 +123,12 @@ export class GmailNotificationService {
     stakeAmount: number
   ): Promise<boolean> {
     try {
-      const subject = `✅ Stake Confirmed: ${stakeAmount} FLOW for "${meetingTitle}"`;
+      const subject = `✅ Stake Confirmed: ${stakeAmount} ETH for "${meetingTitle}"`;
 
       const htmlBody = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #00D4FF;">Stake Confirmed!</h2>
-          <p>Your stake of <strong>${stakeAmount} FLOW</strong> has been successfully recorded for:</p>
+          <p>Your stake of <strong>${stakeAmount} ETH</strong> has been successfully recorded for:</p>
           <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0;">${meetingTitle}</h3>
           </div>
@@ -251,7 +251,7 @@ export class GmailNotificationService {
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
           <h1 style="margin: 0; font-size: 28px;">Staking Required</h1>
-          <p style="margin: 10px 0 0 0; opacity: 0.95;">Confirm your attendance with FLOW tokens</p>
+          <p style="margin: 10px 0 0 0; opacity: 0.95;">Confirm your attendance with ETH</p>
         </div>
 
         <div style="background: white; border: 1px solid #e2e8f0; border-radius: 0 0 12px 12px; padding: 30px;">
@@ -266,7 +266,7 @@ export class GmailNotificationService {
 
           <div style="background: #fff5f5; border: 1px solid #feb2b2; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
             <p style="margin: 0; color: #c53030; font-size: 14px; font-weight: 600;">REQUIRED STAKE</p>
-            <p style="margin: 10px 0 0 0; font-size: 32px; font-weight: bold; color: #2d3748;">${data.stakeAmount} FLOW</p>
+            <p style="margin: 10px 0 0 0; font-size: 32px; font-weight: bold; color: #2d3748;">${data.stakeAmount} ETH</p>
             <p style="margin: 10px 0 0 0; color: #718096; font-size: 14px;">Deadline: ${data.deadlineStr}</p>
           </div>
 
@@ -279,7 +279,7 @@ export class GmailNotificationService {
           <div style="background: #edf2f7; border-radius: 8px; padding: 20px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #2d3748;">How it works:</h3>
             <ol style="color: #4a5568; line-height: 1.8;">
-              <li>Stake ${data.stakeAmount} FLOW to confirm your attendance</li>
+              <li>Stake ${data.stakeAmount} ETH to confirm your attendance</li>
               <li>Attend the meeting and receive an attendance code</li>
               <li>Submit the code to reclaim your stake</li>
               <li>Miss the meeting? Your stake is forfeited to attendees</li>
@@ -292,7 +292,7 @@ export class GmailNotificationService {
         </div>
 
         <p style="color: #a0aec0; font-size: 12px; text-align: center; margin-top: 20px;">
-          Powered by AI Voice Calendar | Built on Flow Blockchain
+          Powered by AI Voice Calendar | Built on Base
         </p>
       </div>
     `;

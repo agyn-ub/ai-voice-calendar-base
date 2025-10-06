@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pendingMeetingsDb, PendingEventData } from '@/lib/db/pendingMeetings';
 import { GmailNotificationService, StakeInvitationData } from '@/lib/services/gmailNotificationService';
 import { accountsDb } from '@/lib/db/accountsDb';
-import FlowService from '@/lib/flow/flowService';
 
 interface InitiateStakeRequest {
   walletAddress: string;

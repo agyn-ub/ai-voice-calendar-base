@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useFlow } from "./FlowProvider";
-import FlowService from "@/lib/flow/flowService";
+import { useAccount } from "wagmi";
 import { UnifiedChatInput } from "./ui/UnifiedChatInput";
 import { TypingIndicator } from "./ui/TypingIndicator";
 import { AmbiguousContact, PendingEvent } from '@/types/openai';
@@ -19,19 +18,20 @@ interface Message {
 }
 
 export function UnifiedCalendarChat() {
-  const { user } = useFlow();
+  const { address: walletAddress, isConnected } = useAccount();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [flowBalance, setFlowBalance] = useState<string>("0.0");
+  const [ethBalance, setEthBalance] = useState<string>("0.0");
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [pendingEventData, setPendingEventData] = useState<PendingEvent | undefined>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (user?.addr) {
-      fetchFlowBalance();
+    if (walletAddress) {
+      // Balance is fetched via useBalance hook in other components
+      // For now we'll leave this as placeholder
     }
-  }, [user]);
+  }, [walletAddress]);
 
   useEffect(() => {
     scrollToBottom();
@@ -41,19 +41,11 @@ export function UnifiedCalendarChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const fetchFlowBalance = async () => {
-    if (!user?.addr) return;
-    try {
-      const balance = await FlowService.getFlowBalance(user.addr);
-      setFlowBalance(balance);
-    } catch (error) {
-      console.error("Error fetching balance:", error);
-    }
-  };
+  // Balance fetching handled by wagmi useBalance hook
 
   const handleMessage = async (text: string) => {
-    if (!user?.addr) {
-      alert("Please connect your Flow wallet first");
+    if (!walletAddress) {
+      alert("Please connect your wallet first");
       return;
     }
 
@@ -80,7 +72,7 @@ export function UnifiedCalendarChat() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          wallet_address: user.addr,
+          wallet_address: walletAddress,
           message: text,
           conversation_id: conversationId,
           timezone
@@ -124,7 +116,7 @@ export function UnifiedCalendarChat() {
           const assistantMessage: Message = {
             id: `assistant-${Date.now()}`,
             type: 'assistant',
-            content: `I'll schedule your meeting with a ${data.pendingEvent.stakeRequired || 10} FLOW stake requirement. Sending stake invitation to attendees...`,
+            content: `I'll schedule your meeting with a ${data.pendingEvent.stakeRequired || 0.01} ETH stake requirement. Sending stake invitation to attendees...`,
             timestamp: new Date(),
             status: 'sent'
           };
@@ -136,27 +128,16 @@ export function UnifiedCalendarChat() {
             const meetingId = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             const stakeAmount = data.pendingEvent.stakeRequired || 10;
 
-            try {
-              await FlowService.createMeeting(
-                meetingId,
-                "",
-                data.pendingEvent.summary,
-                new Date(data.pendingEvent.startDateTime).getTime() / 1000,
-                new Date(data.pendingEvent.endDateTime).getTime() / 1000,
-                stakeAmount.toString()
-              );
-              console.log(`[UnifiedCalendarChat] Created blockchain meeting: ${meetingId}`);
-            } catch (blockchainError) {
-              console.error('[UnifiedCalendarChat] Error creating blockchain meeting:', blockchainError);
-              // Continue anyway - we can still send invitations
-            }
+            // Note: Blockchain meeting creation will be handled on-chain
+            // when users actually stake through the smart contract
+            console.log(`[UnifiedCalendarChat] Meeting ID generated: ${meetingId}`);
 
             // Then call API to store in database and send emails
             const stakeResponse = await fetch('/api/staking/initiate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                walletAddress: user.addr,
+                walletAddress: walletAddress,
                 eventData: {
                   summary: data.pendingEvent.summary,
                   description: data.pendingEvent.description,
@@ -176,7 +157,7 @@ export function UnifiedCalendarChat() {
               const stakeMessage: Message = {
                 id: `assistant-${Date.now()}-stake`,
                 type: 'assistant',
-                content: `✅ Stake invitations sent!\n\n• Required stake: ${data.pendingEvent.stakeRequired || 10} FLOW\n• Attendees: ${data.pendingEvent.resolvedAttendees?.join(', ')}\n• Calendar invitations will be sent after they stake\n• Meeting ID: ${stakeData.meetingId}`,
+                content: `✅ Stake invitations sent!\n\n• Required stake: ${data.pendingEvent.stakeRequired || 0.01} ETH\n• Attendees: ${data.pendingEvent.resolvedAttendees?.join(', ')}\n• Calendar invitations will be sent after they stake\n• Meeting ID: ${stakeData.meetingId}`,
                 timestamp: new Date(),
                 status: 'sent'
               };
