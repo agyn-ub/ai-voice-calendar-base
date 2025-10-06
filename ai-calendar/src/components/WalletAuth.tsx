@@ -18,6 +18,7 @@ import {
 } from '@coinbase/onchainkit/identity';
 import { useAccount } from 'wagmi';
 import { useEffect } from 'react';
+import { SimpleWalletAuth } from './SimpleWalletAuth';
 
 interface WalletAuthProps {
   onWalletConnect?: (address: string) => void;
@@ -26,6 +27,7 @@ interface WalletAuthProps {
 
 export function WalletAuth({ onWalletConnect, onWalletDisconnect }: WalletAuthProps) {
   const { address, isConnected } = useAccount();
+  const isLocal = process.env.NEXT_PUBLIC_NETWORK === 'local';
 
   useEffect(() => {
     if (isConnected && address) {
@@ -35,6 +37,17 @@ export function WalletAuth({ onWalletConnect, onWalletDisconnect }: WalletAuthPr
     }
   }, [isConnected, address, onWalletConnect, onWalletDisconnect]);
 
+  // For local development, use simple wallet connection
+  if (isLocal) {
+    return (
+      <SimpleWalletAuth 
+        onWalletConnect={onWalletConnect}
+        onWalletDisconnect={onWalletDisconnect}
+      />
+    );
+  }
+
+  // For Base networks, use OnchainKit components
   return (
     <div className="flex items-center gap-3">
       <Wallet>

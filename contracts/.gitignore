@@ -1,0 +1,55 @@
+# Compiler files
+cache/
+out/
+
+# Ignores development broadcast logs
+broadcast/*/31337/
+broadcast/**/dry-run/
+
+# Docs
+docs/
+
+# Dotenv file
+.env
+.env.local
+.env.production
+
+# Coverage
+coverage/
+coverage.json
+lcov.info
+
+# Node modules (if any JS tooling is added)
+node_modules/
+
+# Foundry test artifacts
+forge-cache/
+
+# Deployment artifacts for local testing
+broadcast/Deploy.s.sol/31337/
+
+# MacOS
+.DS_Store
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+.pytest_cache/
+.python-version
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+tmp/
+
+# Don't ignore these (important for hackathon/production transparency)
+!broadcast/*/8453/        # Base Mainnet deployments
+!broadcast/*/84532/       # Base Sepolia deployments
