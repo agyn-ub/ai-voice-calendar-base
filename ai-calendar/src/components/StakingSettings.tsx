@@ -22,7 +22,6 @@ export function StakingSettings({
   // Get ETH balance
   const { data: balance } = useBalance({
     address,
-    watch: true,
   });
 
   const ethBalance = balance ? formatEther(balance.value) : "0.0";

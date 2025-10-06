@@ -22,6 +22,8 @@ export function UnifiedCalendarChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [pendingEventData, setPendingEventData] = useState<PendingEvent | undefined>();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -216,7 +218,7 @@ export function UnifiedCalendarChat() {
     await handleMessage(resolvedMessage);
   };
 
-  if (!user?.addr) {
+  if (!walletAddress) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
         <div className="text-center space-y-4 max-w-md">
@@ -239,11 +241,11 @@ export function UnifiedCalendarChat() {
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 bg-green-400 rounded-full"></div>
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            {user.addr.slice(0, 6)}...{user.addr.slice(-4)}
+            {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
           </span>
         </div>
         <div className="text-sm text-gray-600 dark:text-gray-400">
-          {parseFloat(flowBalance).toFixed(2)} FLOW
+          Connected
         </div>
       </div>
 
@@ -317,7 +319,7 @@ export function UnifiedCalendarChat() {
                       {ambiguous.matches.map((match, idx) => (
                         <button
                           key={`${match.email}-${idx}`}
-                          onClick={() => handleContactSelection(match.email, match.name)}
+                          onClick={() => handleContactSelection(match.email)}
                           className="w-full text-left p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                         >
                           <div className="flex items-center justify-between">

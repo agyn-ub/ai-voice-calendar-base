@@ -34,7 +34,8 @@ export function StakeTransaction({
     );
   }
 
-  const contracts = [
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contracts: any = [
     {
       address: contractAddress as `0x${string}`,
       abi: MeetingStakeABI,

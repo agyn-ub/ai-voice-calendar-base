@@ -5,6 +5,7 @@ import { useAccount } from 'wagmi';
 import { formatEther } from 'viem';
 import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
 import { toast } from 'react-hot-toast';
+import type { Meeting } from '@/lib/web3/contract';
 
 interface StakingInterfaceProps {
   meetingId: string;
