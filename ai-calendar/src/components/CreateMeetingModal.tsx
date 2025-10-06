@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { StakingSettings } from "./StakingSettings";
-import FlowService from "@/lib/flow/flowService";
-import { useFlow } from "./FlowProvider";
+import { useAccount } from "wagmi";
 import { formatDateTimeWithTimezone } from "@/lib/utils/timezone";
 
 interface CreateMeetingModalProps {
@@ -17,7 +16,7 @@ export function CreateMeetingModal({
   onClose,
   onSuccess
 }: CreateMeetingModalProps) {
-  const { user } = useFlow();
+  const { address: walletAddress } = useAccount();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState("");
@@ -25,7 +24,7 @@ export function CreateMeetingModal({
   const [endTime, setEndTime] = useState("");
   const [attendees, setAttendees] = useState("");
   const [stakingEnabled, setStakingEnabled] = useState(false);
-  const [stakeAmount, setStakeAmount] = useState("10.0");
+  const [stakeAmount, setStakeAmount] = useState("0.01");
   const [isCreating, setIsCreating] = useState(false);
 
   const handleStakingChange = (enabled: boolean, amount: string) => {
@@ -34,7 +33,7 @@ export function CreateMeetingModal({
   };
 
   const handleCreate = async () => {
-    if (!user?.addr || !title || !date || !startTime || !endTime) {
+    if (!walletAddress || !title || !date || !startTime || !endTime) {
       alert("Please fill in all required fields");
       return;
     }
@@ -52,7 +51,7 @@ export function CreateMeetingModal({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          wallet_address: user.addr,
+          wallet_address: walletAddress,
           event: {
             summary: title,
             description,
@@ -81,14 +80,8 @@ export function CreateMeetingModal({
         const startTimestamp = startDateTime.getTime() / 1000; // Convert to seconds
         const endTimestamp = endDateTime.getTime() / 1000;
 
-        await FlowService.createMeeting(
-          meetingId,
-          calendarEventId,
-          title,
-          startTimestamp,
-          endTimestamp,
-          stakeAmount
-        );
+        // Note: Blockchain meeting creation will be handled when users stake
+        // through the smart contract interface
 
         // Store meeting ID with calendar event (you might want to implement this API)
         await fetch("/api/calendar/google/events/update-metadata", {
@@ -97,7 +90,7 @@ export function CreateMeetingModal({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            wallet_address: user.addr,
+            wallet_address: walletAddress,
             event_id: calendarEventId,
             meeting_id: meetingId,
             stake_amount: stakeAmount,

@@ -2,29 +2,34 @@
 
 import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import * as fcl from '@onflow/fcl';
+import { useAccount } from 'wagmi';
 import { MeetingStakeData } from '@/lib/services/stakingService';
+import { WalletAuth } from '@/components/WalletAuth';
+import { formatEther } from 'viem';
+import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
 
 export default function StakePage() {
   const params = useParams();
   const meetingId = params.meetingId as string;
 
-  const [user, setUser] = useState<any>(null);
+  const { address: walletAddress, isConnected } = useAccount();
   const [meetingInfo, setMeetingInfo] = useState<MeetingStakeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [staking, setStaking] = useState(false);
   const [hasStaked, setHasStaked] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contractInstance, setContractInstance] = useState<MeetingStakeContract | null>(null);
 
-  // Subscribe to Flow user authentication
   useEffect(() => {
-    fcl.currentUser.subscribe(setUser);
+    if (typeof window !== 'undefined') {
+      setContractInstance(new MeetingStakeContract());
+    }
   }, []);
 
   // Fetch meeting information
   useEffect(() => {
     fetchMeetingInfo();
-  }, [meetingId, user]);
+  }, [meetingId, walletAddress]);
 
   const fetchMeetingInfo = async () => {
     try {
@@ -39,9 +44,9 @@ export default function StakePage() {
       setMeetingInfo(data.meeting);
 
       // Check if current user has already staked
-      if (user?.addr) {
+      if (walletAddress) {
         const userStake = data.meeting.stakes.find(
-          (s: any) => s.walletAddress.toLowerCase() === user.addr.toLowerCase()
+          (s: any) => s.walletAddress.toLowerCase() === walletAddress.toLowerCase()
         );
         setHasStaked(!!userStake);
       }
@@ -53,61 +58,50 @@ export default function StakePage() {
     }
   };
 
-  const handleConnectWallet = async () => {
-    try {
-      await fcl.authenticate();
-    } catch (err) {
-      console.error('Error connecting wallet:', err);
-      setError('Failed to connect wallet');
-    }
-  };
-
   const handleStake = async () => {
-    if (!user?.addr || !meetingInfo) return;
+    if (!walletAddress || !meetingInfo || !contractInstance) return;
+
+    setStaking(true);
+    setError(null);
 
     try {
-      setStaking(true);
-      setError(null);
+      // First stake on blockchain
+      const receipt = await contractInstance.stakeForMeeting(
+        meetingId,
+        meetingInfo.stakeAmount.toString()
+      );
 
+      // Then record in database
       const response = await fetch('/api/staking/stake', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           meetingId,
-          amount: meetingInfo.requiredStake,
-          walletAddress: user.addr
-        })
+          walletAddress,
+          transactionHash: receipt.transactionHash,
+        }),
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to stake');
+        throw new Error('Failed to record stake');
       }
 
-      // Refresh meeting info to show updated stake
-      await fetchMeetingInfo();
+      // Send confirmation email
+      await fetch('/api/staking/send-confirmation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          meetingId,
+          walletAddress,
+        }),
+      });
+
       setHasStaked(true);
-
-      // Trigger calendar event creation after successful staking
-      try {
-        const scheduleResponse = await fetch('/api/staking/confirm-and-schedule', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            meetingId,
-            stakerWallet: user.addr,
-            stakerEmail: user.email // If available from Flow account
-          })
-        });
-
-        if (scheduleResponse.ok) {
-          const scheduleData = await scheduleResponse.json();
-          console.log('[Stake] Calendar event created:', scheduleData.googleEventId);
-        }
-      } catch (err) {
-        console.error('[Stake] Error creating calendar event:', err);
-      }
-
+      await fetchMeetingInfo(); // Refresh meeting info
     } catch (err) {
       console.error('Error staking:', err);
       setError(err instanceof Error ? err.message : 'Failed to stake');
@@ -118,204 +112,182 @@ export default function StakePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading meeting details...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center">
+        <div className="text-white text-xl">Loading meeting details...</div>
       </div>
     );
   }
 
-  if (error && !meetingInfo) {
+  if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
-        <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-8">
-          <div className="text-center">
-            <div className="text-red-500 text-5xl mb-4">⚠️</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Meeting Not Found</h2>
-            <p className="text-gray-600">{error}</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center">
+        <div className="text-red-400 text-xl">{error}</div>
       </div>
     );
   }
 
-  if (!meetingInfo) return null;
-
-  const startTime = new Date(meetingInfo.startTime);
-  const endTime = new Date(meetingInfo.endTime);
-  const stakeDeadline = new Date(startTime.getTime() - 60 * 60 * 1000); // 1 hour before
-  const isPastDeadline = new Date() > stakeDeadline;
-  const totalStaked = meetingInfo.stakes.reduce((sum, s) => sum + s.amount, 0);
+  if (!meetingInfo) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center">
+        <div className="text-gray-400 text-xl">Meeting not found</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12">
-      <div className="max-w-3xl mx-auto px-4">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-xl p-8 text-center">
-          <h1 className="text-3xl font-bold mb-2">Meeting Stake Required</h1>
-          <p className="opacity-90">Confirm your attendance by staking FLOW tokens</p>
-        </div>
-
-        {/* Main Card */}
-        <div className="bg-white shadow-xl rounded-b-xl">
-          {/* Meeting Details */}
-          <div className="p-8 border-b">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-6">Meeting Details</h2>
-
-            <div className="space-y-4">
-              <div className="flex items-start">
-                <span className="text-2xl mr-3">📅</span>
-                <div>
-                  <p className="font-medium text-gray-900">Date & Time</p>
-                  <p className="text-gray-600">
-                    {startTime.toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
-                  <p className="text-gray-600">
-                    {startTime.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })} - {endTime.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      timeZoneName: 'short'
-                    })}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start">
-                <span className="text-2xl mr-3">👤</span>
-                <div>
-                  <p className="font-medium text-gray-900">Organizer</p>
-                  <p className="text-gray-600">{meetingInfo.organizer}</p>
-                </div>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
+      <div className="container mx-auto px-4 py-16">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-8">
+              <h1 className="text-3xl font-bold mb-2">Stake for Meeting</h1>
+              <p className="text-green-100">
+                Commit your attendance with ETH stake
+              </p>
             </div>
-          </div>
 
-          {/* Staking Info */}
-          <div className="p-8 bg-gray-50">
-            <div className="bg-white rounded-lg p-6 border-2 border-indigo-200">
-              <div className="text-center">
-                <p className="text-sm font-semibold text-indigo-600 uppercase tracking-wide">Required Stake</p>
-                <p className="text-4xl font-bold text-gray-900 mt-2">{meetingInfo.requiredStake} FLOW</p>
+            {/* Meeting Details */}
+            <div className="p-8">
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-semibold mb-4">
+                    {meetingInfo.title}
+                  </h2>
+                  {meetingInfo.description && (
+                    <p className="text-gray-300 mb-4">
+                      {meetingInfo.description}
+                    </p>
+                  )}
+                </div>
 
-                {!isPastDeadline ? (
-                  <p className="text-gray-600 mt-2">
-                    Deadline: {stakeDeadline.toLocaleString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })}
-                  </p>
+                {/* Meeting Info Grid */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-gray-900 p-4 rounded-lg">
+                    <p className="text-sm text-gray-400 mb-1">Date & Time</p>
+                    <p className="font-semibold">
+                      {new Date(meetingInfo.startTime).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="bg-gray-900 p-4 rounded-lg">
+                    <p className="text-sm text-gray-400 mb-1">Duration</p>
+                    <p className="font-semibold">
+                      {Math.round(
+                        (new Date(meetingInfo.endTime).getTime() -
+                          new Date(meetingInfo.startTime).getTime()) /
+                          (1000 * 60)
+                      )}{' '}
+                      minutes
+                    </p>
+                  </div>
+                  {meetingInfo.location && (
+                    <div className="bg-gray-900 p-4 rounded-lg">
+                      <p className="text-sm text-gray-400 mb-1">Location</p>
+                      <p className="font-semibold">{meetingInfo.location}</p>
+                    </div>
+                  )}
+                  <div className="bg-gray-900 p-4 rounded-lg">
+                    <p className="text-sm text-gray-400 mb-1">Organizer</p>
+                    <p className="font-semibold">
+                      {meetingInfo.organizerEmail}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Stake Info */}
+                <div className="bg-gradient-to-r from-blue-900 to-purple-900 p-6 rounded-lg">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-semibold">Staking Details</h3>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-300">Required Stake</p>
+                      <p className="text-2xl font-bold">
+                        {meetingInfo.stakeAmount} ETH
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Total Staked</span>
+                      <span className="font-semibold">
+                        {meetingInfo.stakes.reduce(
+                          (sum, s) => sum + s.amount,
+                          0
+                        )}{' '}
+                        ETH
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-300">Participants</span>
+                      <span className="font-semibold">
+                        {meetingInfo.stakes.length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Wallet Connection */}
+                {!isConnected ? (
+                  <div className="bg-gray-900 p-6 rounded-lg text-center">
+                    <p className="text-gray-400 mb-4">
+                      Connect your wallet to stake for this meeting
+                    </p>
+                    <WalletAuth />
+                  </div>
+                ) : hasStaked ? (
+                  <div className="bg-green-900 p-6 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <svg
+                        className="w-6 h-6 text-green-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <div>
+                        <p className="font-semibold">
+                          You have already staked for this meeting
+                        </p>
+                        <p className="text-sm text-green-400 mt-1">
+                          Remember to attend and submit the attendance code to
+                          reclaim your stake
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-                  <p className="text-red-600 mt-2 font-medium">⚠️ Staking deadline has passed</p>
+                  <div className="space-y-4">
+                    <button
+                      onClick={handleStake}
+                      disabled={staking}
+                      className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-lg transition-all"
+                    >
+                      {staking
+                        ? 'Processing...'
+                        : `Stake ${meetingInfo.stakeAmount} ETH`}
+                    </button>
+                    <p className="text-xs text-gray-400 text-center">
+                      By staking, you commit to attending this meeting. Your
+                      stake will be refunded upon attendance confirmation.
+                    </p>
+                  </div>
                 )}
-              </div>
 
-              {/* Progress Bar */}
-              <div className="mt-6">
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
-                  <span>{meetingInfo.stakes.length} participants staked</span>
-                  <span>{totalStaked} FLOW total</span>
-                </div>
-                <div className="bg-gray-200 rounded-full h-3">
-                  <div
-                    className="bg-gradient-to-r from-indigo-500 to-purple-500 h-3 rounded-full transition-all"
-                    style={{ width: `${Math.min((meetingInfo.stakes.length / 10) * 100, 100)}%` }}
-                  />
-                </div>
+                {error && (
+                  <div className="bg-red-900 p-4 rounded-lg">
+                    <p className="text-red-400">{error}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-
-          {/* Action Section */}
-          <div className="p-8">
-            {!user?.addr ? (
-              <div className="text-center">
-                <p className="text-gray-600 mb-4">Connect your Flow wallet to stake</p>
-                <button
-                  onClick={handleConnectWallet}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-105"
-                >
-                  Connect Wallet
-                </button>
-              </div>
-            ) : hasStaked ? (
-              <div className="text-center">
-                <div className="text-green-500 text-5xl mb-4">✅</div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">You're all set!</h3>
-                <p className="text-gray-600">Your stake has been confirmed. See you at the meeting!</p>
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    Remember to get the attendance code from the organizer during the meeting to reclaim your stake.
-                  </p>
-                </div>
-              </div>
-            ) : isPastDeadline ? (
-              <div className="text-center">
-                <div className="text-red-500 text-5xl mb-4">⏰</div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Staking Closed</h3>
-                <p className="text-gray-600">The deadline for staking has passed.</p>
-              </div>
-            ) : (
-              <div className="text-center">
-                <p className="text-gray-600 mb-6">
-                  Connected as: <span className="font-mono text-sm">{user.addr}</span>
-                </p>
-                <button
-                  onClick={handleStake}
-                  disabled={staking}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {staking ? 'Processing...' : `Stake ${meetingInfo.requiredStake} FLOW`}
-                </button>
-                {error && (
-                  <p className="mt-4 text-red-600 text-sm">{error}</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Info Box */}
-          <div className="p-8 bg-gray-50 border-t">
-            <h3 className="font-semibold text-gray-900 mb-3">How it works:</h3>
-            <ol className="space-y-2 text-gray-600">
-              <li className="flex">
-                <span className="font-semibold mr-2">1.</span>
-                <span>Stake {meetingInfo.requiredStake} FLOW to confirm your attendance</span>
-              </li>
-              <li className="flex">
-                <span className="font-semibold mr-2">2.</span>
-                <span>Attend the meeting and receive an attendance code from the organizer</span>
-              </li>
-              <li className="flex">
-                <span className="font-semibold mr-2">3.</span>
-                <span>Submit the code within 15 minutes after the meeting ends</span>
-              </li>
-              <li className="flex">
-                <span className="font-semibold mr-2">4.</span>
-                <span>Get your stake refunded automatically</span>
-              </li>
-            </ol>
-            <p className="mt-4 text-sm text-gray-500">
-              Note: If you miss the meeting without submitting the attendance code, your stake will be forfeited and distributed among attendees.
-            </p>
-          </div>
         </div>
-
-        {/* Footer */}
-        <p className="text-center text-gray-500 text-sm mt-8">
-          Powered by AI Voice Calendar • Built on Flow Blockchain
-        </p>
       </div>
     </div>
   );

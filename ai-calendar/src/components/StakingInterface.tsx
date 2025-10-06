@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MeetingStakeContract } from '@/lib/web3/contract';
-import { WalletService } from '@/lib/web3/wallet';
+import { useAccount } from 'wagmi';
+import { formatEther } from 'viem';
+import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
+import { toast } from 'react-hot-toast';
 
 interface StakingInterfaceProps {
   meetingId: string;
@@ -12,7 +14,6 @@ interface StakingInterfaceProps {
   endTime: string;
   requiredStake?: number;
   isOrganizer: boolean;
-  walletAddress: string | null;
   onStakeComplete?: () => void;
 }
 
@@ -24,9 +25,9 @@ export default function StakingInterface({
   endTime,
   requiredStake,
   isOrganizer,
-  walletAddress,
   onStakeComplete
 }: StakingInterfaceProps) {
+  const { address: walletAddress, isConnected } = useAccount();
   const [stakeStatus, setStakeStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [attendanceCode, setAttendanceCode] = useState('');
@@ -34,16 +35,23 @@ export default function StakingInterface({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [contractInstance, setContractInstance] = useState<MeetingStakeContract | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setContractInstance(new MeetingStakeContract());
+    }
+  }, []);
 
   // Fetch stake status
   const fetchStakeStatus = async () => {
-    if (!meetingId || !walletAddress) return;
+    if (!meetingId || !walletAddress || !contractInstance) return;
     
     setIsRefreshing(true);
     try {
-      const meeting = await MeetingStakeContract.getMeetingInfo(meetingId);
-      const stake = await MeetingStakeContract.getStakeInfo(meetingId, walletAddress);
-      const stakers = await MeetingStakeContract.getMeetingStakers(meetingId);
+      const meeting = await contractInstance.getMeetingInfo(meetingId);
+      const stake = await contractInstance.getStakeInfo(meetingId, walletAddress);
+      const stakers = await contractInstance.getMeetingStakers(meetingId);
       
       if (meeting) {
         const now = Math.floor(Date.now() / 1000);
@@ -65,16 +73,16 @@ export default function StakingInterface({
           meeting: {
             ...meeting,
             status,
-            requiredStake: MeetingStakeContract.formatStakeAmount(meeting.requiredStake),
+            requiredStake: formatEther(meeting.requiredStake),
             hasAttendanceCode: meeting.attendanceCode !== ''
           },
           userStake: stake ? {
-            amount: MeetingStakeContract.formatStakeAmount(stake.amount),
+            amount: formatEther(stake.amount),
             hasCheckedIn: stake.hasCheckedIn,
             isRefunded: stake.isRefunded
           } : null,
           stats: {
-            totalStaked: MeetingStakeContract.formatStakeAmount(meeting.totalStaked),
+            totalStaked: formatEther(meeting.totalStaked),
             totalStakers: stakers.length,
             totalAttended: 0, // Would need to iterate through stakers to count
             totalAbsent: 0
@@ -90,32 +98,37 @@ export default function StakingInterface({
   };
 
   useEffect(() => {
-    fetchStakeStatus();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchStakeStatus, 30000);
-    return () => clearInterval(interval);
-  }, [meetingId, walletAddress]);
+    if (contractInstance) {
+      fetchStakeStatus();
+      // Refresh every 30 seconds
+      const interval = setInterval(fetchStakeStatus, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [meetingId, walletAddress, contractInstance]);
 
   // Create staked meeting
   const createStakedMeeting = async () => {
-    if (!walletAddress || !requiredStake) return;
+    if (!walletAddress || !requiredStake || !contractInstance) return;
     
     setLoading(true);
     setError('');
     
     try {
-      const txHash = await MeetingStakeContract.createMeeting(
+      const receipt = await contractInstance.createMeeting(
         meetingId,
         eventId,
         String(requiredStake),
-        new Date(startTime),
-        new Date(endTime)
+        Math.floor(new Date(startTime).getTime() / 1000),
+        Math.floor(new Date(endTime).getTime() / 1000)
       );
       
-      setSuccess(`Meeting created! Transaction: ${txHash.slice(0, 10)}...`);
+      toast.success(`Meeting created! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
+      setSuccess(`Meeting created! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       await fetchStakeStatus();
     } catch (error: any) {
-      setError(error?.message || 'Failed to create staking requirement');
+      const errorMsg = error?.message || 'Failed to create staking requirement';
+      setError(errorMsg);
+      toast.error(errorMsg);
       console.error('Error creating staked meeting:', error);
     } finally {
       setLoading(false);
@@ -124,22 +137,25 @@ export default function StakingInterface({
 
   // Stake for meeting
   const stakeForMeeting = async () => {
-    if (!walletAddress || !stakeStatus?.meeting) return;
+    if (!walletAddress || !stakeStatus?.meeting || !contractInstance) return;
     
     setLoading(true);
     setError('');
     
     try {
-      const txHash = await MeetingStakeContract.stakeForMeeting(
+      const receipt = await contractInstance.stakeForMeeting(
         meetingId,
         String(stakeStatus.meeting.requiredStake)
       );
       
-      setSuccess(`Successfully staked! Transaction: ${txHash.slice(0, 10)}...`);
+      toast.success(`Successfully staked! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
+      setSuccess(`Successfully staked! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       await fetchStakeStatus();
       onStakeComplete?.();
     } catch (error: any) {
-      setError(error?.message || 'Failed to stake');
+      const errorMsg = error?.message || 'Failed to stake';
+      setError(errorMsg);
+      toast.error(errorMsg);
       console.error('Error staking:', error);
     } finally {
       setLoading(false);
@@ -148,7 +164,7 @@ export default function StakingInterface({
 
   // Generate attendance code (for organizers)
   const generateAttendanceCode = async () => {
-    if (!walletAddress || !isOrganizer) return;
+    if (!walletAddress || !isOrganizer || !contractInstance) return;
     
     setLoading(true);
     setError('');
@@ -157,16 +173,19 @@ export default function StakingInterface({
       // Generate a random 6-character code
       const code = Math.random().toString(36).substring(2, 8).toUpperCase();
       
-      const txHash = await MeetingStakeContract.generateAttendanceCode(
+      const receipt = await contractInstance.generateAttendanceCode(
         meetingId,
         code
       );
       
       setAttendanceCode(code);
+      toast.success('Attendance code generated! Share it with attendees.');
       setSuccess('Attendance code generated! Share it with attendees.');
       await fetchStakeStatus();
     } catch (error: any) {
-      setError(error?.message || 'Failed to generate code');
+      const errorMsg = error?.message || 'Failed to generate code';
+      setError(errorMsg);
+      toast.error(errorMsg);
       console.error('Error generating code:', error);
     } finally {
       setLoading(false);
@@ -175,22 +194,25 @@ export default function StakingInterface({
 
   // Submit attendance code (for attendees)
   const submitAttendanceCode = async () => {
-    if (!walletAddress || !inputCode) return;
+    if (!walletAddress || !inputCode || !contractInstance) return;
     
     setLoading(true);
     setError('');
     
     try {
-      const txHash = await MeetingStakeContract.submitAttendanceCode(
+      const receipt = await contractInstance.submitAttendanceCode(
         meetingId,
         inputCode
       );
       
+      toast.success('Attendance confirmed! Your stake will be refunded after the meeting.');
       setSuccess('Attendance confirmed! Your stake will be refunded after the meeting.');
       setInputCode('');
       await fetchStakeStatus();
     } catch (error: any) {
-      setError(error?.message || 'Failed to submit code');
+      const errorMsg = error?.message || 'Failed to submit code';
+      setError(errorMsg);
+      toast.error(errorMsg);
       console.error('Error submitting code:', error);
     } finally {
       setLoading(false);
@@ -199,25 +221,28 @@ export default function StakingInterface({
 
   // Settle meeting (after check-in period ends)
   const settleMeeting = async () => {
-    if (!walletAddress) return;
+    if (!walletAddress || !contractInstance) return;
     
     setLoading(true);
     setError('');
     
     try {
-      const txHash = await MeetingStakeContract.settleMeeting(meetingId);
+      const receipt = await contractInstance.settleMeeting(meetingId);
       
-      setSuccess(`Meeting settled! Transaction: ${txHash.slice(0, 10)}...`);
+      toast.success(`Meeting settled! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
+      setSuccess(`Meeting settled! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       await fetchStakeStatus();
     } catch (error: any) {
-      setError(error?.message || 'Failed to settle meeting');
+      const errorMsg = error?.message || 'Failed to settle meeting';
+      setError(errorMsg);
+      toast.error(errorMsg);
       console.error('Error settling:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (!walletAddress) {
+  if (!isConnected || !walletAddress) {
     return (
       <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
         <p className="text-gray-400 text-sm">Connect your wallet to participate in staking</p>
@@ -231,7 +256,7 @@ export default function StakingInterface({
       <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 space-y-3">
         <h3 className="text-white font-semibold">Enable Staking for This Meeting</h3>
         <p className="text-gray-300 text-sm">
-          Require attendees to stake {requiredStake} FLOW to participate
+          Require attendees to stake {requiredStake} ETH to participate
         </p>
         <button
           onClick={createStakedMeeting}
@@ -265,7 +290,7 @@ export default function StakingInterface({
         <div>
           <h3 className="text-white font-semibold">Meeting Staking</h3>
           <p className="text-gray-400 text-sm mt-1">
-            Required Stake: {meeting.requiredStake} FLOW
+            Required Stake: {meeting.requiredStake} ETH
           </p>
         </div>
         <button
@@ -299,7 +324,7 @@ export default function StakingInterface({
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-gray-900 rounded p-2">
           <p className="text-xs text-gray-400">Total Staked</p>
-          <p className="text-sm font-semibold text-white">{stats.totalStaked} FLOW</p>
+          <p className="text-sm font-semibold text-white">{stats.totalStaked} ETH</p>
         </div>
         <div className="bg-gray-900 rounded p-2">
           <p className="text-xs text-gray-400">Participants</p>
@@ -319,7 +344,7 @@ export default function StakingInterface({
       {userStake && (
         <div className="bg-gray-900 rounded p-3 space-y-2">
           <p className="text-sm text-gray-300">
-            Your Stake: <span className="font-semibold text-white">{userStake.amount} FLOW</span>
+            Your Stake: <span className="font-semibold text-white">{userStake.amount} ETH</span>
           </p>
           {userStake.hasCheckedIn ? (
             <p className="text-sm text-green-400">✓ Attendance confirmed</p>
@@ -341,7 +366,7 @@ export default function StakingInterface({
             disabled={loading}
             className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? 'Staking...' : `Stake ${meeting.requiredStake} FLOW`}
+            {loading ? 'Staking...' : `Stake ${meeting.requiredStake} ETH`}
           </button>
         )}
 
