@@ -209,7 +209,7 @@ Be concise and helpful in your responses.`;
         let needsDisambiguation = false;
         let ambiguousContacts = undefined;
         let pendingEvent = undefined;
-        let needsStakeFlow = false;
+        let needsStake = false;
 
         for (const response of toolResponses) {
           try {
@@ -221,10 +221,10 @@ Be concise and helpful in your responses.`;
               console.log('[OpenAI] Disambiguation detected in tool response');
               break;
             }
-            if (parsed.needsStakeFlow) {
-              needsStakeFlow = true;
+            if (parsed.needsStake) {
+              needsStake = true;
               pendingEvent = parsed.pendingEvent;
-              console.log('[OpenAI] Stake flow needed with', parsed.pendingEvent?.stakeRequired, 'FLOW');
+              console.log('[OpenAI] Stake flow needed with', parsed.pendingEvent?.stakeRequired, 'ETH');
             }
           } catch {
             // Ignore parse errors for non-disambiguation responses
@@ -240,7 +240,7 @@ Be concise and helpful in your responses.`;
           needsDisambiguation,
           ambiguousContacts,
           pendingEvent,
-          needsStakeFlow
+          needsStake
         };
       }
 
@@ -452,7 +452,7 @@ Be concise and helpful in your responses.`;
     }
 
     // Apply default stake if attendees are present and no stake specified
-    const DEFAULT_STAKE_AMOUNT = 10; // Default 10 FLOW for meetings with attendees
+    const DEFAULT_STAKE_AMOUNT = 0.01; // Default 0.01 ETH for meetings with attendees
     const effectiveStakeAmount = stakeRequired || (event.attendees && event.attendees.length > 0 ? DEFAULT_STAKE_AMOUNT : 0);
 
     if (effectiveStakeAmount > 0) {
@@ -461,7 +461,7 @@ Be concise and helpful in your responses.`;
       // If there are attendees and stake is required, don't create calendar event yet
       // Return the event details for the stake flow
       if (event.attendees && event.attendees.length > 0) {
-        console.log('[OpenAI] Meeting with attendees - using stake flow with', effectiveStakeAmount, 'FLOW');
+        console.log('[OpenAI] Meeting with attendees - using stake flow with', effectiveStakeAmount, 'ETH');
         return {
           success: true,
           message: 'Event details prepared for stake flow',
@@ -477,7 +477,7 @@ Be concise and helpful in your responses.`;
             stakeRequired: effectiveStakeAmount,
             resolvedAttendees: event.attendees.map((a: { email: string }) => a.email)
           },
-          needsStakeFlow: true
+          needsStake: true
         };
       }
     }

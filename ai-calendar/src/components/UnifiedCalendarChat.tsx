@@ -109,7 +109,7 @@ export function UnifiedCalendarChat() {
         setMessages(prev => [...prev, disambiguationMessage]);
       } else {
         // Check if stake flow is needed
-        if (data.needsStakeFlow && data.pendingEvent) {
+        if (data.needsStake && data.pendingEvent) {
           console.log('[UnifiedCalendarChat] Stake flow needed, initiating stake invitations');
 
           // Show message that event will be created with stake
@@ -227,7 +227,7 @@ export function UnifiedCalendarChat() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Connect Your Flow Wallet</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Connect Your Wallet</h2>
           <p className="text-gray-600 dark:text-gray-400">Connect your wallet to start creating meetings with voice or text</p>
         </div>
       </div>
@@ -265,19 +265,19 @@ export function UnifiedCalendarChat() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button
-                  onClick={() => handleMessage("Schedule team meeting tomorrow at 3pm with 10 FLOW stake")}
+                  onClick={() => handleMessage("Schedule team meeting tomorrow at 3pm with 0.01 ETH stake")}
                   className="text-left p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-700"
                 >
                   <p className="text-sm text-gray-700 dark:text-gray-300">
-                    &quot;Team meeting tomorrow 3pm, stake 10 FLOW&quot;
+                    &quot;Team meeting tomorrow 3pm, stake 0.01 ETH&quot;
                   </p>
                 </button>
                 <button
-                  onClick={() => handleMessage("Meeting with Sarah Friday 2pm, 20 FLOW stake")}
+                  onClick={() => handleMessage("Meeting with Sarah Friday 2pm, 0.02 ETH stake")}
                   className="text-left p-4 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-700"
                 >
                   <p className="text-sm text-gray-700 dark:text-gray-300">
-                    &quot;Meeting with Sarah Friday 2pm, stake 20 FLOW&quot;
+                    &quot;Meeting with Sarah Friday 2pm, stake 0.02 ETH&quot;
                   </p>
                 </button>
               </div>

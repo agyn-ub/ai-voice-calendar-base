@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     await gmailService.sendStakeConfirmation(
       account.google_email,
       meetingTitle,
-      stakeAmount || 10 // Default to 10 FLOW if not specified
+      stakeAmount || 0.01 // Default to 0.01 ETH if not specified
     );
 
     return NextResponse.json({ success: true });

@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Update event description to include staking info
-        const stakingInfo = `\n\n💰 Staking Required: ${event.stakeRequired} FLOW\n` +
+        const stakingInfo = `\n\n💰 Staking Required: ${event.stakeRequired} ETH\n` +
           `Meeting ID: ${meetingId}\n` +
           `Stake Link: ${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/stake/${meetingId}\n` +
           `Stake by: ${new Date(startTime.getTime() - 60 * 60 * 1000).toLocaleString()}`;

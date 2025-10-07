@@ -11,7 +11,7 @@ Extract the following information:
 1. Meeting title/purpose
 2. Date and time (convert relative dates like "tomorrow" to actual dates)
 3. Duration (default 1 hour if not specified)
-4. Stake amount in FLOW (default 10 if not specified)
+4. Stake amount in ETH (default 0.01 if not specified)
 5. Participants (names or emails)
 
 Return a JSON object with this structure:
@@ -27,9 +27,9 @@ Return a JSON object with this structure:
 Current date/time for reference: ${new Date().toISOString()}
 
 Examples:
-- "Team meeting tomorrow 3pm, stake 10 FLOW" -> Extract title: "Team meeting", time: tomorrow 3pm, stake: 10
-- "Meeting with Sarah about project, 20 FLOW stake" -> Extract title: "Meeting with Sarah", participants: ["Sarah"], stake: 20
-- "Daily standup 9am" -> Extract title: "Daily standup", time: today 9am if before 9am else tomorrow 9am, stake: 10 (default)
+- "Team meeting tomorrow 3pm, stake 0.01 ETH" -> Extract title: "Team meeting", time: tomorrow 3pm, stake: 0.01
+- "Meeting with Sarah about project, 0.02 ETH stake" -> Extract title: "Meeting with Sarah", participants: ["Sarah"], stake: 0.02
+- "Daily standup 9am" -> Extract title: "Daily standup", time: today 9am if before 9am else tomorrow 9am, stake: 0.01 (default)
 `;
 
 export async function POST(request: NextRequest) {
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     // Set default stake if not specified and ensure it's a number
     if (!parsedData.stakeAmount) {
-      parsedData.stakeAmount = 10.0;
+      parsedData.stakeAmount = 0.01;
     } else {
       // Ensure stakeAmount is a number with decimal
       parsedData.stakeAmount = parseFloat(parsedData.stakeAmount);

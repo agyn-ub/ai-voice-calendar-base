@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     // Prepare calendar event
     const calendarEvent = {
       summary: eventData.summary,
-      description: `${eventData.description || ''}\n\n💎 This meeting requires a ${pendingMeeting.stake_amount} FLOW stake.\nMeeting ID: ${meetingId}`,
+      description: `${eventData.description || ''}\n\n💎 This meeting requires a ${pendingMeeting.stake_amount} ETH stake.\nMeeting ID: ${meetingId}`,
       location: eventData.location,
       start: {
         dateTime: eventData.startDateTime,

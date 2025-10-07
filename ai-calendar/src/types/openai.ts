@@ -33,7 +33,7 @@ export interface CalendarEventInput {
   };
   recurrence?: string[];
   colorId?: string;
-  stakeRequired?: number; // Optional FLOW stake requirement
+  stakeRequired?: number; // Optional ETH stake requirement (in ETH)
 }
 
 export interface GetEventsParams {
@@ -208,7 +208,7 @@ export const CALENDAR_TOOLS = [
           },
           stakeRequired: {
             type: 'number',
-            description: 'Optional: Amount of FLOW tokens required to stake for attending this meeting. Attendees must stake this amount and will get it back if they attend, or lose it if they miss.'
+            description: 'Optional: Amount of ETH required to stake for attending this meeting (in ETH, e.g., 0.01). Attendees must stake this amount and will get it back if they attend, or lose it if they miss.'
           }
         },
         required: ['summary', 'startDate', 'startHour', 'startMinute', 'startPeriod']

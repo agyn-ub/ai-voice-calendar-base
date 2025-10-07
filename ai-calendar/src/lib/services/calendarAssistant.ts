@@ -100,7 +100,7 @@ export class CalendarAssistantService {
         needsDisambiguation: result.needsDisambiguation,
         ambiguousContacts: result.ambiguousContacts,
         pendingEvent: result.pendingEvent,
-        needsStakeFlow: result.needsStakeFlow
+        needsStake: result.needsStake
       };
     } catch (error) {
       console.error('Error processing assistant request:', error);
