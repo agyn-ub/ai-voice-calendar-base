@@ -1,3 +1,22 @@
+/**
+ * Database abstraction layer
+ * This file determines which database implementation to use
+ * based on environment configuration
+ */
+
+// Check if Supabase is configured
+const isSupabaseConfigured = !!(
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+// Log which database is being used (helpful for debugging)
+if (typeof window === 'undefined') { // Only log on server
+  console.log(`[Database] Using ${isSupabaseConfigured ? 'Supabase' : 'SQLite/JSON fallback'} implementation`);
+}
+
+// For backward compatibility, keep the old implementation if Supabase not configured
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import crypto from 'crypto';
 
@@ -243,3 +262,16 @@ export function getDb() {
   // This function is no longer used but kept to avoid breaking imports
   return null;
 }
+
+// Export database implementations based on configuration
+export const accountsDb = isSupabaseConfigured
+  ? require('./supabase-accounts').accountsDb
+  : require('./accountsDb').accountsDb;
+
+export const contactsDb = isSupabaseConfigured
+  ? require('./supabase-contacts').contactsDb
+  : require('./contactsDb').contactsDb;
+
+export const pendingMeetingsDb = isSupabaseConfigured
+  ? require('./supabase-pendingMeetings').pendingMeetingsDb
+  : require('./pendingMeetings').pendingMeetingsDb;

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@coinbase/onchainkit": "^1.1.1",
+    "@supabase/supabase-js": "^2.74.0",
     "@tanstack/react-query": "^5.51.11",
     "@types/jsonwebtoken": "^9.0.10",
     "ethers": "^6.15.0",
