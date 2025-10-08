@@ -1,5 +1,5 @@
-import { accountsDb } from '@/lib/db/accountsDb';
-import { contactsDb } from '@/lib/db/contactsDb';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
+import { postgresContactsDb } from '@/lib/db/postgresContactsDb';
 
 export interface ResolveResult {
   resolved: string[];  // Array of resolved email addresses
@@ -26,7 +26,7 @@ class LocalContactsService {
     console.log(`[LocalContacts] Resolving ${attendees.length} attendees for wallet: ${walletAddress}`);
 
     // Get account ID
-    const account = accountsDb.getAccountByWalletSync(walletAddress);
+    const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
     if (!account || !account.id) {
       console.warn('[LocalContacts] No account found for wallet address');
       return { resolved: [], details: ['✗ No calendar connection found'] };
@@ -52,7 +52,7 @@ class LocalContactsService {
         details.push(`✓ ${trimmed} (email address)`);
       } else {
         // It's a name, search in contacts
-        const searchResults = await contactsDb.searchContactsByName(account.id, trimmed);
+        const searchResults = await postgresContactsDb.searchContactsByName(account.id, trimmed);
 
         console.log(`[LocalContacts] Search for "${trimmed}" returned ${searchResults.length} results:`,
           searchResults.map(r => ({ name: r.name, email: r.email, confidence: r.confidence })));
@@ -116,13 +116,13 @@ class LocalContactsService {
    * Search contacts by name
    */
   async searchContactsByName(walletAddress: string, searchQuery: string) {
-    const account = accountsDb.getAccountByWalletSync(walletAddress);
+    const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
     if (!account || !account.id) {
       console.warn('[LocalContacts] No account found for wallet address');
       return [];
     }
 
-    const results = contactsDb.searchContactsByNameSync(account.id, searchQuery);
+    const results = await postgresContactsDb.searchContactsByName(account.id, searchQuery);
 
     // Map to format expected by existing code
     return results.map(contact => ({
@@ -136,12 +136,12 @@ class LocalContactsService {
    * Get the best matching contact's email for a given name
    */
   async getContactEmail(walletAddress: string, name: string): Promise<{ email: string; displayName: string } | null> {
-    const account = accountsDb.getAccountByWalletSync(walletAddress);
+    const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
     if (!account || !account.id) {
       return null;
     }
 
-    const contact = contactsDb.findBestMatchSync(account.id, name);
+    const contact = await postgresContactsDb.findBestMatch(account.id, name);
 
     if (contact) {
       return {
@@ -157,12 +157,12 @@ class LocalContactsService {
    * Get all contacts for a wallet
    */
   async listContacts(walletAddress: string, limit: number = 100) {
-    const account = accountsDb.getAccountByWalletSync(walletAddress);
+    const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
     if (!account || !account.id) {
       return [];
     }
 
-    const contacts = contactsDb.getContactsSync(account.id, limit);
+    const contacts = await postgresContactsDb.getContacts(account.id, limit);
 
     // Format for compatibility with existing code
     return contacts.map(contact => ({
@@ -177,13 +177,13 @@ class LocalContactsService {
   /**
    * Get contact count
    */
-  async getContactCount(walletAddress: string): number {
-    const account = accountsDb.getAccountByWalletSync(walletAddress);
+  async getContactCount(walletAddress: string): Promise<number> {
+    const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
     if (!account || !account.id) {
       return 0;
     }
 
-    return contactsDb.getContactCountSync(account.id);
+    return postgresContactsDb.getContactCount(account.id);
   }
 
   /**

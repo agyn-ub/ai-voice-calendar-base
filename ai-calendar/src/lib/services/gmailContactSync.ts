@@ -1,5 +1,5 @@
 import { google, gmail_v1 } from 'googleapis';
-import { accountsDb } from '@/lib/db/accountsDb';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
 
 export class GmailContactSyncService {
   private gmail: gmail_v1.Gmail;
@@ -21,7 +21,7 @@ export class GmailContactSyncService {
   }
 
   static async createFromWallet(walletAddress: string): Promise<GmailContactSyncService | null> {
-    const account = accountsDb.getAccountByWalletSync(walletAddress);
+    const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
     if (!account || !account.access_token || !account.refresh_token) {
       return null;
     }

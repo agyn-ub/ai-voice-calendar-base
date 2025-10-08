@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GmailContactSyncService } from '@/lib/services/gmailContactSync';
-import { accountsDb } from '@/lib/db/accountsDb';
-import { contactsDb } from '@/lib/db/contactsDb';
-import db from '@/lib/db/sqlite';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
+import { postgresContactsDb } from '@/lib/db/postgresContactsDb';
 
 export async function POST(request: NextRequest) {
   try {
-    // Ensure database is initialized
-    await db.initialize();
 
     const body = await request.json();
     const { wallet_address, action = 'sync', maxPages = 10 } = body;
@@ -22,7 +19,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Sync] Starting ${action} for wallet: ${wallet_address}`);
 
     // Get account
-    const account = accountsDb.getAccountByWalletSync(wallet_address);
+    const account = await postgresAccountsDb.getAccountByWallet(wallet_address);
     console.log('[Sync] Account lookup result:', {
       found: !!account,
       hasId: !!(account?.id),
@@ -68,11 +65,11 @@ export async function POST(request: NextRequest) {
 
         // Clear existing contacts and save new ones
         console.log(`[Sync] Saving ${contacts.length} contacts to database...`);
-        await contactsDb.clearContacts(account.id);
-        const inserted = await contactsDb.saveContacts(account.id, contacts);
+        await postgresContactsDb.clearContacts(account.id);
+        const inserted = await postgresContactsDb.saveContacts(account.id, contacts);
 
         // Update sync timestamp
-        await accountsDb.updateSyncTime(account.id);
+        await postgresAccountsDb.updateSyncTime(account.id);
 
         // Get summary statistics
         const withNames = contacts.filter(c => c.name !== null).length;
@@ -97,7 +94,7 @@ export async function POST(request: NextRequest) {
       case 'clear': {
         // Clear stored contacts
         console.log('[Sync] Clearing stored contacts...');
-        const success = await contactsDb.clearContacts(account.id);
+        const success = await postgresContactsDb.clearContacts(account.id);
 
         return NextResponse.json({
           success: true,
@@ -124,8 +121,6 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  // Ensure database is initialized
-  await db.initialize();
   try {
     const { searchParams } = new URL(request.url);
     const wallet_address = searchParams.get('wallet_address');
@@ -138,7 +133,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get account
-    const account = accountsDb.getAccountByWalletSync(wallet_address);
+    const account = await postgresAccountsDb.getAccountByWallet(wallet_address);
     if (!account || !account.id) {
       return NextResponse.json({
         success: true,
@@ -152,8 +147,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get stored contacts from SQLite database
-    const contacts = await contactsDb.getContacts(account.id, 1000);
+    // Get stored contacts from PostgreSQL database
+    const contacts = await postgresContactsDb.getContacts(account.id, 1000);
 
     // Calculate statistics
     const withNames = contacts.filter(c => c.name !== null).length;
