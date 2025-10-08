@@ -19,14 +19,15 @@ export async function GET(request: NextRequest) {
     );
   }
   
-  // Generate the OAuth URL with calendar and Gmail scopes
+  // Generate the OAuth URL with calendar and Gmail metadata scopes
   const scopes = [
     'https://www.googleapis.com/auth/calendar.readonly',
     'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/gmail.metadata', // Access to Gmail metadata for contact extraction
-    'https://www.googleapis.com/auth/gmail.send' // Send emails on behalf of the user
+    'https://www.googleapis.com/auth/gmail.metadata' // For extracting email contacts from headers
   ];
+  
+  console.log('[OAuth Connect] Generating auth URL with scopes:', scopes);
   
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',

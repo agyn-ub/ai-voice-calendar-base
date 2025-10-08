@@ -45,11 +45,15 @@ export default function GoogleCalendarConnect({ walletAddress }: GoogleCalendarC
 
   const connectCalendar = async () => {
     setConnecting(true);
+    console.log('[GoogleCalendarConnect] Starting connection for wallet:', walletAddress);
+    
     try {
       const response = await fetch(`/api/calendar/google/connect?wallet_address=${walletAddress}`);
       const data = await response.json();
       
       if (data.authUrl) {
+        console.log('[GoogleCalendarConnect] Opening OAuth popup with URL:', data.authUrl);
+        
         // Open OAuth flow in new window
         const authWindow = window.open(
           data.authUrl, 
@@ -57,20 +61,43 @@ export default function GoogleCalendarConnect({ walletAddress }: GoogleCalendarC
           'width=500,height=700,left=200,top=100'
         );
         
+        if (!authWindow) {
+          console.error('[GoogleCalendarConnect] Popup was blocked! Please allow popups for this site.');
+          alert('Please allow popups for this site to connect Google Calendar');
+          setConnecting(false);
+          return;
+        }
+        
+        console.log('[GoogleCalendarConnect] Popup opened, monitoring for completion...');
+        
         // Fallback: Check if window closed manually
         const checkInterval = setInterval(() => {
-          if (authWindow?.closed) {
+          try {
+            if (authWindow?.closed) {
+              console.log('[GoogleCalendarConnect] Popup closed, checking connection status...');
+              clearInterval(checkInterval);
+              setConnecting(false);
+              checkConnectionStatus();
+            }
+          } catch (err) {
+            console.error('[GoogleCalendarConnect] Error checking window status:', err);
             clearInterval(checkInterval);
             setConnecting(false);
-            checkConnectionStatus();
           }
         }, 1000);
         
         // Clear interval after 5 minutes to prevent memory leak
-        setTimeout(() => clearInterval(checkInterval), 300000);
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          console.log('[GoogleCalendarConnect] Timeout reached, stopping window monitoring');
+          setConnecting(false);
+        }, 300000);
+      } else {
+        console.error('[GoogleCalendarConnect] No auth URL received from server:', data);
+        setConnecting(false);
       }
     } catch (error) {
-      console.error('Error connecting calendar:', error);
+      console.error('[GoogleCalendarConnect] Error connecting calendar:', error);
       setConnecting(false);
     }
   };
@@ -115,23 +142,41 @@ export default function GoogleCalendarConnect({ walletAddress }: GoogleCalendarC
     
     // Listen for messages from the OAuth popup
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
+      console.log('[GoogleCalendarConnect] Received message from:', event.origin, 'Data:', event.data);
+      
+      // Check origin matches
+      if (event.origin !== window.location.origin) {
+        console.warn('[GoogleCalendarConnect] Message from different origin, ignoring:', event.origin);
+        return;
+      }
       
       if (event.data?.type === 'calendar-auth-complete') {
+        console.log('[GoogleCalendarConnect] Auth complete message received:', {
+          success: event.data.success,
+          message: event.data.message
+        });
+        
         setConnecting(false);
         if (event.data.success) {
+          console.log('[GoogleCalendarConnect] Auth successful, refreshing status...');
           // Refresh status after successful connection
           setTimeout(() => {
             checkConnectionStatus();
           }, 500);
         } else {
-          console.error('Calendar connection failed:', event.data.message);
+          console.error('[GoogleCalendarConnect] Calendar connection failed:', event.data.message);
+          alert(`Failed to connect Google Calendar: ${event.data.message || 'Unknown error'}`);
         }
       }
     };
     
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    console.log('[GoogleCalendarConnect] Message listener registered');
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      console.log('[GoogleCalendarConnect] Message listener removed');
+    };
   }, [walletAddress, checkConnectionStatus]);
 
   useEffect(() => {

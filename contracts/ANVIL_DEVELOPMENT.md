@@ -18,6 +18,7 @@ This guide covers local blockchain development using Anvil (Foundry's local Ethe
 # Start Anvil with default settings
 anvil
 
+
 # Or with custom settings for more consistency
 anvil --accounts 10 --balance 10000 --block-time 1 --host 0.0.0.0
 ```
