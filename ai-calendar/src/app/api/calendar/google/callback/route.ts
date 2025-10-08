@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { accountsDb } from '@/lib/db/accountsDb';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CLIENT_ID,
@@ -189,7 +190,9 @@ export async function GET(request: NextRequest) {
     // Save to database with detailed error handling
     try {
       console.log('[OAuth Callback] Attempting to save to database...');
-      const savedAccount = accountsDb.createOrUpdateAccountSync({
+      
+      // Save to PostgreSQL (primary)
+      const pgAccount = await postgresAccountsDb.saveAccount({
         wallet_address: state,
         google_email: userInfo.email || '',
         access_token: tokens.access_token || '',
@@ -197,7 +200,26 @@ export async function GET(request: NextRequest) {
         token_expiry: tokenExpiry,
         scopes: tokens.scope
       });
-      console.log('[OAuth Callback] Successfully saved account:', savedAccount.wallet_address);
+      
+      if (pgAccount) {
+        console.log('[OAuth Callback] Successfully saved to PostgreSQL:', pgAccount.wallet_address);
+      }
+      
+      // Also save to SQLite/JSON for backward compatibility (will be removed later)
+      try {
+        const savedAccount = accountsDb.createOrUpdateAccountSync({
+          wallet_address: state,
+          google_email: userInfo.email || '',
+          access_token: tokens.access_token || '',
+          refresh_token: tokens.refresh_token || '',
+          token_expiry: tokenExpiry,
+          scopes: tokens.scope
+        });
+        console.log('[OAuth Callback] Also saved to SQLite/JSON for compatibility');
+      } catch (sqliteError) {
+        console.warn('[OAuth Callback] SQLite/JSON save failed (non-critical):', sqliteError);
+      }
+      
     } catch (dbError) {
       console.error('[OAuth Callback] Database save failed:', dbError);
       console.error('[OAuth Callback] Error details:', {
