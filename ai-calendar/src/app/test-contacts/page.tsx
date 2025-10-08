@@ -31,8 +31,9 @@ export default function TestContactsPage() {
   const [storedContacts, setStoredContacts] = useState<StoredContact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<StoredContact[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'loading'>('idle');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'loading' | 'previewing'>('idle');
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [syncProgress, setSyncProgress] = useState<string | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -129,11 +130,22 @@ export default function TestContactsPage() {
   };
 
 
-  const syncGmailContacts = async () => {
+  const syncGmailContacts = async (maxPages: number = 10, action: 'sync' | 'preview' = 'sync') => {
     if (!addr) return;
 
-    setSyncStatus('syncing');
+    setSyncStatus(action === 'preview' ? 'previewing' : 'syncing');
     setSyncResult(null);
+    
+    // Set progress message based on action and pages
+    if (action === 'preview') {
+      setSyncProgress('Previewing contacts (no data will be saved)...');
+    } else if (maxPages === 1) {
+      setSyncProgress('Quick sync: Processing up to 500 messages (10-15 seconds)...');
+    } else if (maxPages === 3) {
+      setSyncProgress('Medium sync: Processing up to 1,500 messages (30-45 seconds)...');
+    } else {
+      setSyncProgress('Full sync: Processing up to 5,000 messages (1-2 minutes)...');
+    }
 
     try {
       const response = await fetch('/api/calendar/google/sync-contacts', {
@@ -143,8 +155,8 @@ export default function TestContactsPage() {
         },
         body: JSON.stringify({
           wallet_address: addr,
-          action: 'sync',
-          maxPages: 10  // Will process up to 5,000 messages (500 per page * 10 pages) - safer for rate limits
+          action: action,
+          maxPages: maxPages
         })
       });
 
@@ -152,8 +164,10 @@ export default function TestContactsPage() {
 
       if (response.ok && data.success) {
         setSyncResult({ success: true, action: data.action, summary: data.summary });
-        // Reload contacts after sync
-        await loadStoredContacts();
+        // Reload contacts after sync (but not for preview)
+        if (action === 'sync') {
+          await loadStoredContacts();
+        }
       } else {
         setSyncResult({ success: false, error: data.error || 'Failed to sync contacts' });
       }
@@ -162,6 +176,7 @@ export default function TestContactsPage() {
       setSyncResult({ success: false, error: 'Failed to sync Gmail contacts' });
     } finally {
       setSyncStatus('idle');
+      setSyncProgress(null);
     }
   };
 
@@ -258,23 +273,80 @@ export default function TestContactsPage() {
             </div>
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={syncGmailContacts}
-              disabled={!addr || syncStatus === 'syncing' || connectionStatus === 'not_connected'}
-              className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {syncStatus === 'syncing' ? 'Syncing (this may take 1-2 minutes)...' : 'Sync Contacts from Gmail'}
-            </button>
-
-            {storedContacts.length > 0 && (
+          <div className="space-y-3">
+            {/* Sync buttons row */}
+            <div className="flex flex-wrap gap-3">
+              {/* Quick Sync - 1 page */}
               <button
-                onClick={clearStoredContacts}
-                disabled={syncStatus === 'syncing'}
-                className="px-6 py-2 bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                onClick={() => syncGmailContacts(1, 'sync')}
+                disabled={!addr || syncStatus !== 'idle' || connectionStatus === 'not_connected'}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Clear All Contacts
+                <div className="text-left">
+                  <div className="font-semibold">Quick Sync</div>
+                  <div className="text-xs opacity-75">~500 messages • 10-15 sec</div>
+                </div>
               </button>
+
+              {/* Medium Sync - 3 pages */}
+              <button
+                onClick={() => syncGmailContacts(3, 'sync')}
+                disabled={!addr || syncStatus !== 'idle' || connectionStatus === 'not_connected'}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <div className="text-left">
+                  <div className="font-semibold">Medium Sync</div>
+                  <div className="text-xs opacity-75">~1,500 messages • 30-45 sec</div>
+                </div>
+              </button>
+
+              {/* Full Sync - 10 pages */}
+              <button
+                onClick={() => syncGmailContacts(10, 'sync')}
+                disabled={!addr || syncStatus !== 'idle' || connectionStatus === 'not_connected'}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <div className="text-left">
+                  <div className="font-semibold">Full Sync</div>
+                  <div className="text-xs opacity-75">~5,000 messages • 1-2 min</div>
+                </div>
+              </button>
+
+              {/* Preview Only */}
+              <button
+                onClick={() => syncGmailContacts(1, 'preview')}
+                disabled={!addr || syncStatus !== 'idle' || connectionStatus === 'not_connected'}
+                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <div className="text-left">
+                  <div className="font-semibold">Preview Only</div>
+                  <div className="text-xs opacity-75">Test without saving</div>
+                </div>
+              </button>
+
+              {storedContacts.length > 0 && (
+                <button
+                  onClick={clearStoredContacts}
+                  disabled={syncStatus !== 'idle'}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <div className="text-left">
+                    <div className="font-semibold">Clear All</div>
+                    <div className="text-xs opacity-75">Remove stored contacts</div>
+                  </div>
+                </button>
+              )}
+            </div>
+
+            {/* Sync Progress Message */}
+            {syncProgress && (
+              <div className="flex items-center gap-3 text-sm text-gray-400">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>{syncProgress}</span>
+              </div>
             )}
           </div>
 
@@ -287,9 +359,12 @@ export default function TestContactsPage() {
             }`}>
               {syncResult.success ? (
                 <>
-                  {syncResult.action === 'sync' && syncResult.summary && (
+                  {(syncResult.action === 'sync' || syncResult.action === 'preview') && syncResult.summary && (
                     <>
-                      <p className="text-green-400 font-semibold">✅ Sync Complete!</p>
+                      <p className="text-green-400 font-semibold">
+                        ✅ {syncResult.action === 'preview' ? 'Preview Complete!' : 'Sync Complete!'}
+                        {syncResult.action === 'preview' && ' (No data was saved)'}
+                      </p>
                       <div className="text-gray-300 text-sm mt-2 grid grid-cols-3 gap-4">
                         <div>
                           <span className="text-gray-400">Total:</span> {syncResult.summary.totalContacts}
