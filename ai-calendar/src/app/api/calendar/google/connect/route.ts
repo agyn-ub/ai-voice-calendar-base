@@ -27,13 +27,18 @@ export async function GET(request: NextRequest) {
     'https://www.googleapis.com/auth/gmail.metadata' // For extracting email contacts from headers
   ];
   
-  console.log('[OAuth Connect] Generating auth URL with scopes:', scopes);
+  console.log('[OAuth Connect] Generating auth URL for wallet:', walletAddress);
+  console.log('[OAuth Connect] Using scopes:', scopes);
+  
+  // Pass wallet address as lowercase in state to ensure consistency
+  const stateValue = walletAddress.toLowerCase();
+  console.log('[OAuth Connect] State value (lowercase):', stateValue);
   
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: scopes,
     prompt: 'consent', // Force consent to ensure refresh token
-    state: walletAddress // Pass wallet address in state parameter
+    state: stateValue // Pass wallet address in state parameter (lowercase)
   });
   
   return NextResponse.json({ authUrl });

@@ -12,14 +12,26 @@ export async function GET(request: NextRequest) {
     );
   }
   
-  const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
+  console.log('[Calendar Status] Checking connection for wallet:', walletAddress);
+  console.log('[Calendar Status] Using lowercase:', walletAddress.toLowerCase());
+  
+  // Ensure consistent case handling - PostgreSQL saves as lowercase
+  const account = await postgresAccountsDb.getAccountByWallet(walletAddress.toLowerCase());
 
   if (!account) {
+    console.log('[Calendar Status] No account found for wallet:', walletAddress.toLowerCase());
     return NextResponse.json({
       connected: false,
       email: null
     });
   }
+
+  console.log('[Calendar Status] Account found:', {
+    id: account.id,
+    wallet: account.wallet_address,
+    email: account.google_email,
+    hasTokens: !!(account.access_token && account.refresh_token)
+  });
 
   return NextResponse.json({
     connected: true,

@@ -189,6 +189,10 @@ export async function GET(request: NextRequest) {
     // Save to database with detailed error handling
     try {
       console.log('[OAuth Callback] Attempting to save to database...');
+      console.log('[OAuth Callback] Wallet address (state):', state);
+      console.log('[OAuth Callback] Email:', userInfo.email);
+      console.log('[OAuth Callback] Has access token:', !!tokens.access_token);
+      console.log('[OAuth Callback] Has refresh token:', !!tokens.refresh_token);
       
       const account = await postgresAccountsDb.saveAccount({
         wallet_address: state,
@@ -201,6 +205,16 @@ export async function GET(request: NextRequest) {
       
       if (account) {
         console.log('[OAuth Callback] Successfully saved to PostgreSQL:', account.wallet_address);
+        
+        // Verify the save by retrieving the account
+        const verification = await postgresAccountsDb.getAccountByWallet(state);
+        if (verification) {
+          console.log('[OAuth Callback] Verification successful - account exists in database');
+          console.log('[OAuth Callback] Verified account email:', verification.google_email);
+        } else {
+          console.error('[OAuth Callback] Verification failed - account not found after save!');
+          throw new Error('Account verification failed after save');
+        }
       } else {
         throw new Error('Failed to save account to database');
       }
