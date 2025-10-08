@@ -1,7 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pendingMeetingsDb, PendingEventData } from '@/lib/db/pendingMeetings';
+import { postgresPendingMeetingsDb } from '@/lib/db/postgresPendingMeetings';
 import { GmailNotificationService, StakeInvitationData } from '@/lib/services/gmailNotificationService';
-import { accountsDb } from '@/lib/db/accountsDb';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
+
+export interface PendingEventData {
+  summary: string;
+  description?: string;
+  location?: string;
+  start: {
+    dateTime: string;
+    timeZone: string;
+  };
+  end: {
+    dateTime: string;
+    timeZone: string;
+  };
+  attendees: Array<{
+    email: string;
+    displayName?: string;
+  }>;
+  conferenceData?: any;
+}
 
 interface InitiateStakeRequest {
   walletAddress: string;
@@ -23,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get organizer's account for email
-    const account = await accountsDb.getAccountByWallet(walletAddress);
+    const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
     if (!account) {
       return NextResponse.json(
         { error: 'No calendar connected for this wallet' },
@@ -38,13 +57,13 @@ export async function POST(request: NextRequest) {
     // This endpoint only handles database and email operations
 
     // Store pending meeting in database
-    await pendingMeetingsDb.createPendingMeeting(
-      meetingId,
-      walletAddress,
-      eventData,
-      stakeAmount,
-      account.google_email || undefined
-    );
+    await postgresPendingMeetingsDb.createPendingMeeting({
+      id: meetingId,
+      organizer_wallet: walletAddress,
+      event_data: JSON.stringify(eventData),
+      stake_amount: stakeAmount,
+      status: 'pending'
+    });
 
     // Send stake invitation emails
     if (eventData.attendees && eventData.attendees.length > 0) {

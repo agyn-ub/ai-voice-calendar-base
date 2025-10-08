@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { googleCalendarService } from '@/lib/services/googleCalendar';
-import { accountsDb } from '@/lib/db/accountsDb';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
 import { StakingService } from '@/lib/services/stakingService';
 import { GmailNotificationService } from '@/lib/services/gmailNotificationService';
 
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   }
   
   // Check if calendar is connected
-  const account = accountsDb.getAccountByWalletSync(walletAddress);
+  const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
   if (!account) {
     return NextResponse.json(
       { error: 'No calendar connected' },

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { calendarAssistantService } from '@/lib/services/calendarAssistant';
-import { accountsDb } from '@/lib/db/accountsDb';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
 import { AssistantRequest } from '@/types/openai';
 
 export async function POST(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if calendar is connected
-    const account = accountsDb.getAccountByWalletSync(wallet_address);
+    const account = await postgresAccountsDb.getAccountByWallet(wallet_address);
     if (!account) {
       return NextResponse.json(
         {

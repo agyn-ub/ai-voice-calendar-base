@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { accountsDb } from '@/lib/db/accountsDb';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const deleted = accountsDb.deleteAccountSync(wallet_address);
+    const deleted = await postgresAccountsDb.deleteAccount(wallet_address);
     
     if (deleted) {
       return NextResponse.json({ success: true, message: 'Calendar disconnected' });

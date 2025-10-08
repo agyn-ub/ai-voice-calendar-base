@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GmailNotificationService } from '@/lib/services/gmailNotificationService';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's email from the account
-    const account = await import('@/lib/db/accountsDb').then(m => m.accountsDb.getAccountByWallet(walletAddress));
+    const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
 
     if (!account?.google_email) {
       return NextResponse.json(

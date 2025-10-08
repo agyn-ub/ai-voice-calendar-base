@@ -1,5 +1,5 @@
 import { google, gmail_v1 } from 'googleapis';
-import { accountsDb } from '@/lib/db/accountsDb';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
 
 export interface StakeInvitationData {
   title: string;
@@ -35,7 +35,7 @@ export class GmailNotificationService {
    * Create service instance from wallet address
    */
   static async createFromWallet(walletAddress: string): Promise<GmailNotificationService | null> {
-    const account = await accountsDb.getAccountByWallet(walletAddress);
+    const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
     if (!account || !account.access_token || !account.refresh_token) {
       console.error('[GmailNotification] No valid tokens for wallet:', walletAddress);
       return null;

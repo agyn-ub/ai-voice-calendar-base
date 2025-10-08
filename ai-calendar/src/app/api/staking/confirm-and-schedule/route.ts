@@ -1,8 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pendingMeetingsDb, PendingEventData } from '@/lib/db/pendingMeetings';
+import { postgresPendingMeetingsDb } from '@/lib/db/postgresPendingMeetings';
 import { googleCalendarService } from '@/lib/services/googleCalendar';
 import { GmailNotificationService } from '@/lib/services/gmailNotificationService';
-import { accountsDb } from '@/lib/db/accountsDb';
+import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
+
+interface PendingEventData {
+  summary: string;
+  description?: string;
+  location?: string;
+  startDateTime: string;
+  endDateTime: string;
+  start?: {
+    dateTime: string;
+    timeZone: string;
+  };
+  end?: {
+    dateTime: string;
+    timeZone: string;
+  };
+  attendees: Array<{
+    email: string;
+    displayName?: string;
+  }>;
+}
 
 interface ConfirmStakeRequest {
   meetingId: string;
@@ -24,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get pending meeting
-    const pendingMeeting = await pendingMeetingsDb.getPendingMeeting(meetingId);
+    const pendingMeeting = await postgresPendingMeetingsDb.getPendingMeeting(meetingId);
     if (!pendingMeeting) {
       return NextResponse.json(
         { error: 'Meeting not found' },
@@ -32,8 +52,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse event data
-    const eventData: PendingEventData = JSON.parse(pendingMeeting.event_data);
+    // Event data is already parsed from PostgreSQL
+    const eventData: PendingEventData = pendingMeeting.event_data;
 
     // Check if calendar event already exists
     if (pendingMeeting.google_event_id) {
@@ -46,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get organizer's account
-    const organizerAccount = await accountsDb.getAccountByWallet(pendingMeeting.organizer_wallet);
+    const organizerAccount = await postgresAccountsDb.getAccountByWallet(pendingMeeting.organizer_wallet);
     if (!organizerAccount) {
       return NextResponse.json(
         { error: 'Organizer calendar not found' },
@@ -93,7 +113,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Staking] Created Google Calendar event ${createdEvent.id} for meeting ${meetingId}`);
 
     // Update pending meeting status
-    await pendingMeetingsDb.updateMeetingStatus(meetingId, 'stake_confirmed', createdEvent.id);
+    await postgresPendingMeetingsDb.updatePendingMeetingStatus(meetingId, 'stake_confirmed', createdEvent.id);
 
     // Send confirmation email to staker
     if (stakerEmail) {
@@ -110,7 +130,7 @@ export async function POST(request: NextRequest) {
     // After all attendees stake, mark as scheduled
     // For now, we'll mark it as scheduled immediately
     // In production, you'd check if all required attendees have staked
-    await pendingMeetingsDb.markAsScheduled(meetingId, createdEvent.id);
+    await postgresPendingMeetingsDb.updatePendingMeetingStatus(meetingId, 'scheduled', createdEvent.id);
 
     return NextResponse.json({
       success: true,
