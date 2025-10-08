@@ -1,26 +1,7 @@
-import { db } from '../db';
+import { meetingStakesDb, type MeetingStakeData as MeetingStakeDataDb, type StakeRecord as StakeRecordDb } from '@/lib/db/postgresMeetingStakes';
 
-export interface MeetingStakeData {
-  meetingId: string;
-  eventId: string;
-  organizer: string;
-  requiredStake: number;
-  startTime: Date;
-  endTime: Date;
-  attendanceCode?: string;
-  codeGeneratedAt?: Date;
-  isSettled: boolean;
-  stakes: StakeRecord[];
-}
-
-export interface StakeRecord {
-  walletAddress: string;
-  amount: number;
-  stakedAt: Date;
-  hasCheckedIn: boolean;
-  checkInTime?: Date;
-  isRefunded: boolean;
-}
+export interface MeetingStakeData extends MeetingStakeDataDb {}
+export interface StakeRecord extends StakeRecordDb {}
 
 export class StakingService {
   private static CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_MEETING_STAKE_CONTRACT || '0x01';
@@ -218,39 +199,21 @@ export class StakingService {
    * Save meeting stake data to database
    */
   private static async saveMeetingStakeData(data: MeetingStakeData): Promise<void> {
-    const allData = await db.read();
-    if (!allData.meetingStakes) {
-      allData.meetingStakes = {};
-    }
-    allData.meetingStakes[data.meetingId] = data;
-    await db.write(allData);
+    await meetingStakesDb.saveMeetingStakeData(data);
   }
 
   /**
    * Get meeting stake data from database
    */
   private static async getMeetingStakeData(meetingId: string): Promise<MeetingStakeData | null> {
-    const allData = await db.read();
-    return allData.meetingStakes?.[meetingId] || null;
+    return await meetingStakesDb.getMeetingStakeData(meetingId);
   }
 
   /**
    * Get all meeting stakes for a wallet address
    */
   static async getStakesForWallet(walletAddress: string): Promise<MeetingStakeData[]> {
-    const allData = await db.read();
-    const stakes: MeetingStakeData[] = [];
-
-    if (allData.meetingStakes) {
-      Object.values(allData.meetingStakes).forEach((meeting: MeetingStakeData) => {
-        const hasStake = meeting.stakes.some((s: StakeRecord) => s.walletAddress === walletAddress);
-        if (hasStake || meeting.organizer === walletAddress) {
-          stakes.push(meeting);
-        }
-      });
-    }
-
-    return stakes;
+    return await meetingStakesDb.getStakesForWallet(walletAddress);
   }
 
   /**
