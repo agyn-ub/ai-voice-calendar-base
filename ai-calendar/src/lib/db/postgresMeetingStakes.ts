@@ -15,6 +15,7 @@ export interface MeetingStakeData {
 
 export interface StakeRecord {
   walletAddress: string;
+  email?: string;
   amount: number;
   stakedAt: string;
   hasCheckedIn: boolean;

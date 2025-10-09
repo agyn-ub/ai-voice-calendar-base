@@ -9,6 +9,7 @@ export interface StakeInvitationData {
   meetingId: string;
   organizerName?: string;
   location?: string;
+  invitationToken?: string;
 }
 
 export class GmailNotificationService {
@@ -82,13 +83,19 @@ export class GmailNotificationService {
         minute: '2-digit'
       })}`;
 
+      // Build stake link with token if provided
+      let stakeLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/stake/${meetingData.meetingId}`;
+      if (meetingData.invitationToken) {
+        stakeLink += `?token=${meetingData.invitationToken}`;
+      }
+
       // Build HTML body
       const htmlBody = this.buildStakeInvitationHTML({
         ...meetingData,
         dateStr,
         timeStr,
         deadlineStr,
-        stakeLink: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/stake/${meetingData.meetingId}`
+        stakeLink
       });
 
       // Compose the email message

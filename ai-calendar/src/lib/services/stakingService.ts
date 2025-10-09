@@ -47,7 +47,8 @@ export class StakingService {
   static async stakeForMeeting(
     meetingId: string,
     amount: number,
-    stakerAddress: string
+    stakerAddress: string,
+    email?: string
   ): Promise<boolean> {
     try {
       // First try to get existing stake data
@@ -86,6 +87,7 @@ export class StakingService {
       // Add the new stake
       stakeData.stakes.push({
         walletAddress: stakerAddress,
+        email,
         amount,
         stakedAt: new Date().toISOString(),
         hasCheckedIn: false,

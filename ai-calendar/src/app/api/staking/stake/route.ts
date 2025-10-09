@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { StakingService } from '@/lib/services/stakingService';
+import { invitationTokensDb } from '@/lib/db/postgresInvitationTokens';
+import { walletEmailAssociationsDb } from '@/lib/db/postgresWalletEmailAssociations';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { meetingId, amount, walletAddress } = body;
+    const { meetingId, amount, walletAddress, token } = body;
 
     if (!meetingId || !amount || !walletAddress) {
       return NextResponse.json(
@@ -29,11 +31,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Record stake in database
+    // Process invitation token if provided
+    let userEmail: string | undefined;
+    if (token) {
+      const tokenData = await invitationTokensDb.useToken(token, walletAddress);
+      if (tokenData && tokenData.email) {
+        userEmail = tokenData.email;
+        // Create wallet-email association
+        await walletEmailAssociationsDb.createAssociation(
+          walletAddress,
+          userEmail,
+          true // created_from_stake = true
+        );
+        console.log(`[Staking] Created wallet-email association: ${walletAddress} <-> ${userEmail}`);
+      } else {
+        console.warn(`[Staking] Invalid or expired token provided: ${token}`);
+      }
+    }
+
+    // Record stake in database (with email if available)
     const success = await StakingService.stakeForMeeting(
       meetingId,
       amount,
-      walletAddress
+      walletAddress,
+      userEmail
     );
 
     if (!success) {

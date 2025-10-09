@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { MeetingStakeData } from '@/lib/services/stakingService';
@@ -9,15 +9,15 @@ import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
 
 export default function StakePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const meetingId = params.meetingId as string;
+  const token = searchParams.get('token');
 
   const { address: walletAddress, isConnected } = useAccount();
   const [meetingInfo, setMeetingInfo] = useState<MeetingStakeData | null>(null);
   const [loading, setLoading] = useState(true);
   const [staking, setStaking] = useState(false);
   const [hasStaked, setHasStaked] = useState(false);
-  const [hasGoogleAuth, setHasGoogleAuth] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contractInstance, setContractInstance] = useState<MeetingStakeContract | null>(null);
 
@@ -27,26 +27,6 @@ export default function StakePage() {
     }
   }, []);
 
-  // Check if user has connected Google Calendar
-  useEffect(() => {
-    const checkGoogleAuth = async () => {
-      if (walletAddress) {
-        setCheckingAuth(true);
-        try {
-          const response = await fetch(`/api/calendar/status?walletAddress=${walletAddress}`);
-          const data = await response.json();
-          setHasGoogleAuth(data.isConnected || false);
-        } catch (err) {
-          console.error('Error checking Google auth status:', err);
-          setHasGoogleAuth(false);
-        } finally {
-          setCheckingAuth(false);
-        }
-      }
-    };
-
-    checkGoogleAuth();
-  }, [walletAddress]);
 
   const fetchMeetingInfo = useCallback(async () => {
     try {
@@ -93,7 +73,7 @@ export default function StakePage() {
         meetingInfo.requiredStake.toString()
       );
 
-      // Then record in database
+      // Then record in database with token if provided
       const response = await fetch('/api/staking/stake', {
         method: 'POST',
         headers: {
@@ -104,6 +84,7 @@ export default function StakePage() {
           walletAddress,
           amount: meetingInfo.requiredStake,
           transactionHash: receipt.transactionHash,
+          token: token || undefined,
         }),
       });
 
@@ -252,38 +233,6 @@ export default function StakePage() {
                     <div className="flex justify-center">
                       <WalletAuth />
                     </div>
-                  </div>
-                ) : !hasGoogleAuth ? (
-                  <div className="bg-yellow-900 p-6 rounded-lg text-center">
-                    <svg
-                      className="w-12 h-12 text-yellow-400 mx-auto mb-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                    <p className="text-yellow-300 font-semibold mb-2">
-                      Google Calendar Required
-                    </p>
-                    <p className="text-sm text-gray-300 mb-4">
-                      Connect your Google Calendar to stake for this meeting and receive calendar invitations
-                    </p>
-                    {checkingAuth ? (
-                      <p className="text-gray-400">Checking authentication...</p>
-                    ) : (
-                      <a
-                        href={`/api/calendar/google/connect?wallet_address=${walletAddress}&redirect=/stake/${meetingId}`}
-                        className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors"
-                      >
-                        Connect Google Calendar
-                      </a>
-                    )}
                   </div>
                 ) : hasStaked ? (
                   <div className="bg-green-900 p-6 rounded-lg">

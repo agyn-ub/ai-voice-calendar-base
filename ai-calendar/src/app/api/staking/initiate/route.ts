@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { postgresPendingMeetingsDb } from '@/lib/db/postgresPendingMeetings';
 import { GmailNotificationService, StakeInvitationData } from '@/lib/services/gmailNotificationService';
 import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
+import { invitationTokensDb } from '@/lib/db/postgresInvitationTokens';
 
 export interface PendingEventData {
   summary: string;
@@ -65,31 +66,42 @@ export async function POST(request: NextRequest) {
       status: 'pending'
     });
 
-    // Send stake invitation emails
+    // Generate invitation tokens for attendees
+    let tokenMap = new Map<string, string>();
+    if (eventData.attendees && eventData.attendees.length > 0) {
+      const attendeeEmails = eventData.attendees.map(a => a.email);
+      tokenMap = await invitationTokensDb.createInvitationTokens(meetingId, attendeeEmails);
+    }
+
+    // Send stake invitation emails with unique tokens
     if (eventData.attendees && eventData.attendees.length > 0) {
       const gmailService = await GmailNotificationService.createFromWallet(walletAddress);
 
       if (gmailService) {
-        const invitationData: StakeInvitationData = {
-          title: eventData.summary,
-          startTime: new Date(eventData.startDateTime),
-          endTime: new Date(eventData.endDateTime),
-          stakeAmount: stakeAmount,
-          meetingId: meetingId,
-          organizerName: account.google_email?.split('@')[0],
-          location: eventData.location
-        };
+        // Send individual emails with unique tokens
+        for (const attendee of eventData.attendees) {
+          const token = tokenMap.get(attendee.email);
+          const invitationData: StakeInvitationData = {
+            title: eventData.summary,
+            startTime: new Date(eventData.startDateTime),
+            endTime: new Date(eventData.endDateTime),
+            stakeAmount: stakeAmount,
+            meetingId: meetingId,
+            organizerName: account.google_email?.split('@')[0],
+            location: eventData.location,
+            invitationToken: token // Pass the unique token
+          };
 
-        const emailsSent = await gmailService.sendStakeInvitation(
-          eventData.attendees,
-          invitationData
-        );
+          const emailSent = await gmailService.sendStakeInvitation(
+            [attendee], // Send to one attendee at a time with their unique token
+            invitationData
+          );
 
-        if (!emailsSent) {
-          console.warn('[Staking] Failed to send some stake invitation emails');
-        } else {
-          console.log(`[Staking] Sent stake invitations to ${eventData.attendees.length} attendees`);
+          if (!emailSent) {
+            console.warn(`[Staking] Failed to send stake invitation email to ${attendee.email}`);
+          }
         }
+        console.log(`[Staking] Sent stake invitations to ${eventData.attendees.length} attendees`);
       }
     }
 
