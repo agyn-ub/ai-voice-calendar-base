@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { meetingStakesDb } from '@/lib/db/postgresMeetingStakes';
+import { postgresPendingMeetingsDb } from '@/lib/db/postgresPendingMeetings';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,15 +15,37 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get meeting stake data
-    const database = await db.read();
-    const meetingStake = database.meetingStakes?.[meetingId];
+    // Get meeting stake data - check meeting_stakes table first
+    let meetingStake = await meetingStakesDb.getMeetingStakeData(meetingId);
     
+    // If not found in meeting_stakes, check pending_meetings
     if (!meetingStake) {
-      return NextResponse.json(
-        { error: 'Meeting not found' },
-        { status: 404 }
-      );
+      const pendingMeeting = await postgresPendingMeetingsDb.getPendingMeeting(meetingId);
+      
+      if (!pendingMeeting) {
+        return NextResponse.json(
+          { error: 'Meeting not found' },
+          { status: 404 }
+        );
+      }
+      
+      // Convert pending meeting to meeting stake format
+      const eventData = typeof pendingMeeting.event_data === 'string' 
+        ? JSON.parse(pendingMeeting.event_data)
+        : pendingMeeting.event_data;
+      
+      meetingStake = {
+        meetingId: pendingMeeting.id,
+        eventId: pendingMeeting.google_event_id || '',
+        organizer: pendingMeeting.organizer_wallet,
+        requiredStake: pendingMeeting.stake_amount,
+        startTime: eventData.start?.dateTime || eventData.startDateTime,
+        endTime: eventData.end?.dateTime || eventData.endDateTime,
+        attendanceCode: undefined,
+        codeGeneratedAt: undefined,
+        isSettled: false,
+        stakes: [] // No stakes yet for pending meetings
+      };
     }
 
     // Calculate meeting status
@@ -66,7 +89,8 @@ export async function GET(request: NextRequest) {
         isSettled: meetingStake.isSettled,
         hasAttendanceCode: !!meetingStake.attendanceCode,
         stakingDeadline: stakingDeadline.toISOString(),
-        checkInDeadline: checkInDeadline.toISOString()
+        checkInDeadline: checkInDeadline.toISOString(),
+        stakes: meetingStake.stakes
       },
       stats: {
         totalStaked,

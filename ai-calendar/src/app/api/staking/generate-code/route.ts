@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { StakingService } from '@/lib/services/stakingService';
-import { db } from '@/lib/db';
+import { meetingStakesDb } from '@/lib/db/postgresMeetingStakes';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,8 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the requester is the meeting organizer
-    const database = await db.read();
-    const meetingStake = database.meetingStakes?.[meetingId];
+    const meetingStake = await meetingStakesDb.getMeetingStakeData(meetingId);
     
     if (!meetingStake) {
       return NextResponse.json(
