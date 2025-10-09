@@ -55,17 +55,7 @@ export async function POST(request: NextRequest) {
     // Event data is already parsed from PostgreSQL
     const eventData: PendingEventData = pendingMeeting.event_data;
 
-    // Check if calendar event already exists
-    if (pendingMeeting.google_event_id) {
-      console.log(`[Staking] Calendar event already created for meeting ${meetingId}`);
-      return NextResponse.json({
-        success: true,
-        message: 'Calendar event already scheduled',
-        googleEventId: pendingMeeting.google_event_id
-      });
-    }
-
-    // Get organizer's account
+    // Get organizer's account first (needed for both create and update)
     const organizerAccount = await postgresAccountsDb.getAccountByWallet(pendingMeeting.organizer_wallet);
     if (!organizerAccount) {
       return NextResponse.json(
@@ -74,10 +64,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get staker's email
+    const stakerAccount = await postgresAccountsDb.getAccountByWallet(stakerWallet);
+    const stakerEmailAddress = stakerEmail || stakerAccount?.google_email;
+
+    if (!stakerEmailAddress) {
+      console.warn(`[Staking] No email found for staker ${stakerWallet}, skipping calendar invite`);
+      return NextResponse.json({
+        success: true,
+        message: 'Stake recorded but no calendar invite sent (no email found)',
+      });
+    }
+
     // Use the Google Calendar service singleton
     const calendarService = googleCalendarService;
 
-    // Prepare calendar event
+    // Check if calendar event already exists
+    if (pendingMeeting.google_event_id) {
+      console.log(`[Staking] Calendar event already exists for meeting ${meetingId}, adding staker as attendee`);
+      
+      try {
+        // Update existing event to add the new staker
+        const updatedEvent = await calendarService.updateEventAttendees(
+          pendingMeeting.organizer_wallet,
+          pendingMeeting.google_event_id,
+          stakerEmailAddress
+        );
+
+        return NextResponse.json({
+          success: true,
+          message: 'Added to existing calendar event',
+          googleEventId: pendingMeeting.google_event_id,
+          eventLink: updatedEvent?.htmlLink
+        });
+      } catch (updateError) {
+        console.error('[Staking] Error updating event attendees:', updateError);
+        return NextResponse.json({
+          success: true,
+          message: 'Stake recorded but failed to update calendar invite',
+          googleEventId: pendingMeeting.google_event_id
+        });
+      }
+    }
+
+    // Prepare calendar event with only organizer and current staker as attendees
     const calendarEvent = {
       summary: eventData.summary,
       description: `${eventData.description || ''}\n\n💎 This meeting requires a ${pendingMeeting.stake_amount} ETH stake.\nMeeting ID: ${meetingId}`,
@@ -90,10 +120,11 @@ export async function POST(request: NextRequest) {
         dateTime: eventData.endDateTime,
         timeZone: eventData.timezone || 'America/Los_Angeles'
       },
-      attendees: eventData.attendees?.map(email => ({
-        email,
-        responseStatus: 'needsAction'
-      })) || [],
+      attendees: [
+        // Only include the organizer and the current staker
+        { email: organizerAccount.google_email, responseStatus: 'accepted' },
+        ...(stakerEmailAddress ? [{ email: stakerEmailAddress, responseStatus: 'needsAction' }] : [])
+      ],
       reminders: {
         useDefault: false,
         overrides: [

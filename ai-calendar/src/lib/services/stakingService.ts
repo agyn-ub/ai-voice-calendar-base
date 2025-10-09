@@ -1,4 +1,5 @@
 import { meetingStakesDb, type MeetingStakeData as MeetingStakeDataDb, type StakeRecord as StakeRecordDb } from '@/lib/db/postgresMeetingStakes';
+import { postgresPendingMeetingsDb } from '@/lib/db/postgresPendingMeetings';
 
 export interface MeetingStakeData extends MeetingStakeDataDb {}
 export interface StakeRecord extends StakeRecordDb {}
@@ -49,20 +50,57 @@ export class StakingService {
     stakerAddress: string
   ): Promise<boolean> {
     try {
-      // Update database with stake record
-      const stakeData = await this.getMeetingStakeData(meetingId);
-      if (stakeData) {
-        stakeData.stakes.push({
-          walletAddress: stakerAddress,
-          amount,
-          stakedAt: new Date().toISOString(),
-          hasCheckedIn: false,
-          isRefunded: false,
-        });
-        await this.saveMeetingStakeData(stakeData);
-        return true;
+      // First try to get existing stake data
+      let stakeData = await this.getMeetingStakeData(meetingId);
+      let wasInPendingState = false;
+      
+      // If not found in meeting_stakes, check pending_meetings
+      if (!stakeData) {
+        const pendingMeeting = await postgresPendingMeetingsDb.getPendingMeeting(meetingId);
+        
+        if (!pendingMeeting) {
+          console.error(`[Staking] Meeting ${meetingId} not found in either table`);
+          return false;
+        }
+        
+        wasInPendingState = true;
+        
+        // Convert pending meeting to stake data format
+        const eventData = typeof pendingMeeting.event_data === 'string' 
+          ? JSON.parse(pendingMeeting.event_data)
+          : pendingMeeting.event_data;
+        
+        // Create initial stake data from pending meeting
+        stakeData = {
+          meetingId: pendingMeeting.id,
+          eventId: pendingMeeting.google_event_id || '',
+          organizer: pendingMeeting.organizer_wallet,
+          requiredStake: pendingMeeting.stake_amount,
+          startTime: eventData.start?.dateTime || eventData.startDateTime,
+          endTime: eventData.end?.dateTime || eventData.endDateTime,
+          isSettled: false,
+          stakes: [],
+        };
       }
-      return false;
+      
+      // Add the new stake
+      stakeData.stakes.push({
+        walletAddress: stakerAddress,
+        amount,
+        stakedAt: new Date().toISOString(),
+        hasCheckedIn: false,
+        isRefunded: false,
+      });
+      
+      // Save to meeting_stakes table
+      await this.saveMeetingStakeData(stakeData);
+      
+      // Update pending meeting status if it was pending
+      if (wasInPendingState) {
+        await postgresPendingMeetingsDb.updatePendingMeetingStatus(meetingId, 'stake_confirmed');
+      }
+      
+      return true;
     } catch (error) {
       console.error('[Staking] Error recording stake for meeting:', error);
       throw error;

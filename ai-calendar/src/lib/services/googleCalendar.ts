@@ -181,6 +181,59 @@ export class GoogleCalendarService {
       throw error;
     }
   }
+  async updateEventAttendees(walletAddress: string, eventId: string, newAttendeeEmail: string): Promise<calendar_v3.Schema$Event | null> {
+    const accessToken = await this.getValidToken(walletAddress);
+    
+    if (!accessToken) {
+      throw new Error('No valid access token available');
+    }
+    
+    this.oauth2Client.setCredentials({
+      access_token: accessToken
+    });
+    
+    const calendar = google.calendar({ version: 'v3', auth: this.oauth2Client });
+    
+    try {
+      // First get the existing event
+      const existingEvent = await calendar.events.get({
+        calendarId: 'primary',
+        eventId: eventId
+      });
+      
+      if (!existingEvent.data) {
+        throw new Error('Event not found');
+      }
+      
+      // Add the new attendee to the existing attendees list
+      const currentAttendees = existingEvent.data.attendees || [];
+      
+      // Check if attendee already exists
+      const attendeeExists = currentAttendees.some(a => a.email === newAttendeeEmail);
+      if (!attendeeExists) {
+        currentAttendees.push({
+          email: newAttendeeEmail,
+          responseStatus: 'needsAction'
+        });
+      }
+      
+      // Update the event with new attendees list
+      const response = await calendar.events.patch({
+        calendarId: 'primary',
+        eventId: eventId,
+        sendUpdates: 'all', // Send invitation to new attendee
+        requestBody: {
+          attendees: currentAttendees
+        }
+      });
+      
+      console.log(`[Calendar] Added ${newAttendeeEmail} to event ${eventId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating event attendees:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance
