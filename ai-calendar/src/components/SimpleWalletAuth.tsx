@@ -14,6 +14,12 @@ export function SimpleWalletAuth({ onWalletConnect, onWalletDisconnect }: Simple
   const { disconnect } = useDisconnect();
   const [showDropdown, setShowDropdown] = useState(false);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('SimpleWalletAuth - Connectors available:', connectors.length);
+    connectors.forEach(c => console.log('Connector:', c.name, c.id));
+  }, [connectors]);
+
   useEffect(() => {
     if (isConnected && address) {
       onWalletConnect?.(address);
@@ -36,17 +42,17 @@ export function SimpleWalletAuth({ onWalletConnect, onWalletDisconnect }: Simple
         </button>
         
         {showDropdown && (
-          <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-lg border border-gray-700 z-50">
+          <div className="absolute right-0 mt-2 w-48 bg-gray-900 rounded-lg shadow-xl border border-gray-700 z-[100]">
             <div className="p-3 border-b border-gray-700">
               <p className="text-xs text-gray-400">Connected to</p>
-              <p className="text-xs font-mono mt-1 break-all">{address}</p>
+              <p className="text-xs font-mono mt-1 break-all text-white">{address}</p>
             </div>
             <button
               onClick={() => {
                 disconnect();
                 setShowDropdown(false);
               }}
-              className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-gray-700 transition-colors"
+              className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-gray-800 transition-colors"
             >
               Disconnect
             </button>
@@ -67,22 +73,28 @@ export function SimpleWalletAuth({ onWalletConnect, onWalletDisconnect }: Simple
       </button>
       
       {showDropdown && !isPending && (
-        <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-lg shadow-lg border border-gray-700 z-50">
-          <p className="px-3 py-2 text-xs text-gray-400 border-b border-gray-700">
+        <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-48 bg-gray-900 rounded-lg shadow-xl border border-gray-600 z-[100]">
+          <p className="px-3 py-2 text-xs text-gray-300 border-b border-gray-700 font-medium">
             Select Wallet
           </p>
-          {connectors.map((connector) => (
-            <button
-              key={connector.id}
-              onClick={() => {
-                connect({ connector });
-                setShowDropdown(false);
-              }}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-700 transition-colors"
-            >
-              {connector.name}
-            </button>
-          ))}
+          {connectors.length > 0 ? (
+            connectors.map((connector) => (
+              <button
+                key={connector.id}
+                onClick={() => {
+                  connect({ connector });
+                  setShowDropdown(false);
+                }}
+                className="w-full text-left px-3 py-2 text-sm text-white hover:bg-gray-800 hover:text-blue-400 transition-colors"
+              >
+                {connector.name}
+              </button>
+            ))
+          ) : (
+            <div className="px-3 py-4 text-sm text-gray-400 text-center">
+              No wallets detected. Please install MetaMask or another Web3 wallet.
+            </div>
+          )}
         </div>
       )}
     </div>

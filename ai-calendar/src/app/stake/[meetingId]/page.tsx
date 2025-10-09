@@ -137,9 +137,9 @@ export default function StakePage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-2xl mx-auto">
-          <div className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="bg-gray-800 rounded-2xl shadow-2xl">
             {/* Header */}
-            <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-8">
+            <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-8 rounded-t-2xl">
               <h1 className="text-3xl font-bold mb-2">Stake for Meeting</h1>
               <p className="text-green-100">
                 Commit your attendance with ETH stake
@@ -217,11 +217,13 @@ export default function StakePage() {
 
                 {/* Wallet Connection */}
                 {!isConnected ? (
-                  <div className="bg-gray-900 p-6 rounded-lg text-center">
+                  <div className="bg-gray-900 p-6 rounded-lg text-center relative overflow-visible">
                     <p className="text-gray-400 mb-4">
                       Connect your wallet to stake for this meeting
                     </p>
-                    <WalletAuth />
+                    <div className="flex justify-center">
+                      <WalletAuth />
+                    </div>
                   </div>
                 ) : hasStaked ? (
                   <div className="bg-green-900 p-6 rounded-lg">
