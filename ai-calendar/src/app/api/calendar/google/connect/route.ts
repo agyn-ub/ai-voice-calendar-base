@@ -19,12 +19,13 @@ export async function GET(request: NextRequest) {
     );
   }
   
-  // Generate the OAuth URL with calendar and Gmail metadata scopes
+  // Generate the OAuth URL with calendar and Gmail scopes
   const scopes = [
     'https://www.googleapis.com/auth/calendar.readonly',
     'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/gmail.metadata' // For extracting email contacts from headers
+    'https://www.googleapis.com/auth/gmail.metadata', // For extracting email contacts from headers
+    'https://www.googleapis.com/auth/gmail.send' // For sending stake invitation emails
   ];
   
   console.log('[OAuth Connect] Generating auth URL for wallet:', walletAddress);
