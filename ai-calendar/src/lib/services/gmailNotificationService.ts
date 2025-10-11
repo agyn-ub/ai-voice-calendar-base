@@ -36,9 +36,20 @@ export class GmailNotificationService {
    * Create service instance from wallet address
    */
   static async createFromWallet(walletAddress: string): Promise<GmailNotificationService | null> {
+    console.log('[GmailNotification] Creating service instance from wallet', {
+      walletAddress,
+      timestamp: new Date().toISOString()
+    });
+
     const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
     if (!account || !account.access_token || !account.refresh_token) {
-      console.error('[GmailNotification] No valid tokens for wallet:', walletAddress);
+      console.error('[GmailNotification] ❌ No valid tokens for wallet', {
+        walletAddress,
+        hasAccount: !!account,
+        hasAccessToken: !!account?.access_token,
+        hasRefreshToken: !!account?.refresh_token,
+        timestamp: new Date().toISOString()
+      });
       return null;
     }
 
@@ -47,6 +58,13 @@ export class GmailNotificationService {
       account.refresh_token
     );
     service.userEmail = account.google_email || null;
+    
+    console.log('[GmailNotification] ✅ Service instance created successfully', {
+      walletAddress,
+      userEmail: service.userEmail,
+      timestamp: new Date().toISOString()
+    });
+    
     return service;
   }
 
@@ -57,6 +75,17 @@ export class GmailNotificationService {
     toEmails: string[],
     meetingData: StakeInvitationData
   ): Promise<boolean> {
+    const startTime = Date.now();
+    console.log('[GmailNotification] Starting stake invitation send', {
+      recipients: toEmails,
+      meetingId: meetingData.meetingId,
+      meetingTitle: meetingData.title,
+      stakeAmount: meetingData.stakeAmount,
+      hasToken: !!meetingData.invitationToken,
+      startTime: meetingData.startTime.toISOString(),
+      endTime: meetingData.endTime.toISOString()
+    });
+
     try {
       const subject = `Action Required: Stake ${meetingData.stakeAmount} ETH for "${meetingData.title}"`;
 
@@ -106,6 +135,12 @@ export class GmailNotificationService {
       );
 
       // Send the email
+      console.log('[GmailNotification] Sending email via Gmail API', {
+        recipients: toEmails.join(', '),
+        subject,
+        messageSize: message.length
+      });
+
       const response = await this.gmail.users.messages.send({
         userId: 'me',
         requestBody: {
@@ -113,10 +148,31 @@ export class GmailNotificationService {
         }
       });
 
-      console.log('[GmailNotification] Stake invitation sent:', response.data.id);
+      const duration = Date.now() - startTime;
+      console.log('[GmailNotification] ✅ Stake invitation sent successfully', {
+        messageId: response.data.id,
+        recipients: toEmails,
+        meetingId: meetingData.meetingId,
+        meetingTitle: meetingData.title,
+        stakeAmount: meetingData.stakeAmount,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
       return true;
     } catch (error) {
-      console.error('[GmailNotification] Error sending stake invitation:', error);
+      const duration = Date.now() - startTime;
+      console.error('[GmailNotification] ❌ Failed to send stake invitation', {
+        error: error instanceof Error ? {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        } : error,
+        recipients: toEmails,
+        meetingId: meetingData.meetingId,
+        meetingTitle: meetingData.title,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
       return false;
     }
   }
@@ -129,6 +185,14 @@ export class GmailNotificationService {
     meetingTitle: string,
     stakeAmount: number
   ): Promise<boolean> {
+    const startTime = Date.now();
+    console.log('[GmailNotification] Starting stake confirmation send', {
+      recipient: toEmail,
+      meetingTitle,
+      stakeAmount,
+      timestamp: new Date().toISOString()
+    });
+
     try {
       const subject = `✅ Stake Confirmed: ${stakeAmount} ETH for "${meetingTitle}"`;
 
@@ -153,16 +217,43 @@ export class GmailNotificationService {
 
       const message = this.createMimeMessage(toEmail, subject, htmlBody);
 
-      await this.gmail.users.messages.send({
+      console.log('[GmailNotification] Sending confirmation email via Gmail API', {
+        recipient: toEmail,
+        subject,
+        messageSize: message.length
+      });
+
+      const response = await this.gmail.users.messages.send({
         userId: 'me',
         requestBody: {
           raw: Buffer.from(message).toString('base64url')
         }
       });
 
+      const duration = Date.now() - startTime;
+      console.log('[GmailNotification] ✅ Stake confirmation sent successfully', {
+        messageId: response.data.id,
+        recipient: toEmail,
+        meetingTitle,
+        stakeAmount,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
       return true;
     } catch (error) {
-      console.error('[GmailNotification] Error sending stake confirmation:', error);
+      const duration = Date.now() - startTime;
+      console.error('[GmailNotification] ❌ Failed to send stake confirmation', {
+        error: error instanceof Error ? {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        } : error,
+        recipient: toEmail,
+        meetingTitle,
+        stakeAmount,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
       return false;
     }
   }
@@ -175,6 +266,14 @@ export class GmailNotificationService {
     meetingTitle: string,
     attendanceCode: string
   ): Promise<boolean> {
+    const startTime = Date.now();
+    console.log('[GmailNotification] Starting attendance code send', {
+      organizer: organizerEmail,
+      meetingTitle,
+      attendanceCode,
+      timestamp: new Date().toISOString()
+    });
+
     try {
       const subject = `Attendance Code for "${meetingTitle}": ${attendanceCode}`;
 
@@ -196,16 +295,43 @@ export class GmailNotificationService {
 
       const message = this.createMimeMessage(organizerEmail, subject, htmlBody);
 
-      await this.gmail.users.messages.send({
+      console.log('[GmailNotification] Sending attendance code email via Gmail API', {
+        organizer: organizerEmail,
+        subject,
+        messageSize: message.length
+      });
+
+      const response = await this.gmail.users.messages.send({
         userId: 'me',
         requestBody: {
           raw: Buffer.from(message).toString('base64url')
         }
       });
 
+      const duration = Date.now() - startTime;
+      console.log('[GmailNotification] ✅ Attendance code sent successfully', {
+        messageId: response.data.id,
+        organizer: organizerEmail,
+        meetingTitle,
+        attendanceCode,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
       return true;
     } catch (error) {
-      console.error('[GmailNotification] Error sending attendance code:', error);
+      const duration = Date.now() - startTime;
+      console.error('[GmailNotification] ❌ Failed to send attendance code', {
+        error: error instanceof Error ? {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        } : error,
+        organizer: organizerEmail,
+        meetingTitle,
+        attendanceCode,
+        duration: `${duration}ms`,
+        timestamp: new Date().toISOString()
+      });
       return false;
     }
   }
