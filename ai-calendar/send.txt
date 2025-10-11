@@ -1,1 +1,1 @@
-schedule an event with Agyn tomorrow 4 am, stake 0.0 1ETH.
+schedule an event with Agyn tomorrow 6:30 am, stake 0.0 1ETH.

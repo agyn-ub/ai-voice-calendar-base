@@ -30,12 +30,32 @@ interface InitiateStakeRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+  console.log('[StakingInitiate] API request received', {
+    method: 'POST',
+    timestamp: new Date().toISOString()
+  });
+
   try {
     const body: InitiateStakeRequest = await request.json();
     const { walletAddress, eventData, stakeAmount } = body;
 
+    console.log('[StakingInitiate] Request payload', {
+      walletAddress,
+      stakeAmount,
+      eventTitle: eventData?.summary,
+      attendeesCount: eventData?.attendees?.length || 0,
+      startTime: eventData?.start?.dateTime,
+      endTime: eventData?.end?.dateTime
+    });
+
     // Validate request
     if (!walletAddress || !eventData || !stakeAmount) {
+      console.error('[StakingInitiate] ❌ Missing required fields', {
+        hasWalletAddress: !!walletAddress,
+        hasEventData: !!eventData,
+        hasStakeAmount: !!stakeAmount
+      });
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -43,21 +63,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Get organizer's account for email
+    console.log('[StakingInitiate] Fetching organizer account from database');
     const account = await postgresAccountsDb.getAccountByWallet(walletAddress);
     if (!account) {
+      console.error('[StakingInitiate] ❌ No account found for wallet', {
+        walletAddress,
+        duration: `${Date.now() - startTime}ms`
+      });
       return NextResponse.json(
         { error: 'No calendar connected for this wallet' },
         { status: 404 }
       );
     }
+    console.log('[StakingInitiate] ✅ Organizer account retrieved', {
+      organizerEmail: account.google_email
+    });
 
     // Generate unique meeting ID
     const meetingId = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log('[StakingInitiate] Generated meeting ID', { meetingId });
 
     // Note: Blockchain meeting creation must happen on client-side where wallet is connected
     // This endpoint only handles database and email operations
 
     // Store pending meeting in database
+    console.log('[StakingInitiate] Storing pending meeting in database');
     await postgresPendingMeetingsDb.createPendingMeeting({
       id: meetingId,
       organizer_wallet: walletAddress,
@@ -65,6 +95,7 @@ export async function POST(request: NextRequest) {
       stake_amount: stakeAmount,
       status: 'pending'
     });
+    console.log('[StakingInitiate] ✅ Pending meeting stored', { meetingId });
 
     // Generate invitation tokens for attendees
     let tokenMap = new Map<string, string>();
@@ -72,13 +103,27 @@ export async function POST(request: NextRequest) {
       const attendeeEmails = eventData.attendees
         .filter(a => a.email) // Filter out attendees without emails
         .map(a => a.email);
+      
+      console.log('[StakingInitiate] Generating invitation tokens', {
+        attendeeCount: attendeeEmails.length,
+        attendees: attendeeEmails
+      });
+      
       if (attendeeEmails.length > 0) {
         tokenMap = await invitationTokensDb.createInvitationTokens(meetingId, attendeeEmails);
+        console.log('[StakingInitiate] ✅ Invitation tokens generated', {
+          tokenCount: tokenMap.size
+        });
       }
     }
 
     // Send stake invitation emails with unique tokens
+    let emailsSentCount = 0;
+    let emailsFailedCount = 0;
+    const emailResults: Array<{email: string, success: boolean, error?: string}> = [];
+
     if (eventData.attendees && eventData.attendees.length > 0) {
+      console.log('[StakingInitiate] Creating Gmail service for sending invitations');
       const gmailService = await GmailNotificationService.createFromWallet(walletAddress);
 
       if (gmailService) {
@@ -87,11 +132,26 @@ export async function POST(request: NextRequest) {
           a => a.email && typeof a.email === 'string' && a.email.trim() !== ''
         );
         
+        console.log('[StakingInitiate] Starting email send process', {
+          totalAttendees: attendeesWithEmail.length,
+          emails: attendeesWithEmail.map(a => a.email)
+        });
+        
         for (const attendee of attendeesWithEmail) {
           const normalizedEmail = attendee.email.trim().toLowerCase();
           const token = tokenMap.get(normalizedEmail);
+          
           if (!token) {
-            console.warn(`[Staking] No token generated for ${attendee.email}`);
+            console.warn(`[StakingInitiate] ⚠️ No token generated for attendee`, {
+              email: attendee.email,
+              normalizedEmail
+            });
+            emailResults.push({
+              email: attendee.email,
+              success: false,
+              error: 'No invitation token generated'
+            });
+            emailsFailedCount++;
             continue;
           }
           
@@ -106,28 +166,82 @@ export async function POST(request: NextRequest) {
             invitationToken: token // Pass the unique token
           };
 
+          console.log('[StakingInitiate] Sending invitation to attendee', {
+            email: attendee.email,
+            hasToken: true,
+            meetingId
+          });
+
           const emailSent = await gmailService.sendStakeInvitation(
-            [attendee], // Send to one attendee at a time with their unique token
+            [attendee.email], // Send to one attendee at a time with their unique token
             invitationData
           );
 
-          if (!emailSent) {
-            console.warn(`[Staking] Failed to send stake invitation email to ${attendee.email}`);
+          if (emailSent) {
+            emailsSentCount++;
+            emailResults.push({
+              email: attendee.email,
+              success: true
+            });
+            console.log('[StakingInitiate] ✅ Invitation sent successfully', {
+              email: attendee.email,
+              token: token.substring(0, 8) + '...'
+            });
+          } else {
+            emailsFailedCount++;
+            emailResults.push({
+              email: attendee.email,
+              success: false,
+              error: 'Failed to send email'
+            });
+            console.error(`[StakingInitiate] ❌ Failed to send invitation`, {
+              email: attendee.email
+            });
           }
         }
-        console.log(`[Staking] Sent stake invitations to ${attendeesWithEmail.length} attendees`);
+        
+        console.log('[StakingInitiate] Email send process completed', {
+          totalAttempted: attendeesWithEmail.length,
+          successful: emailsSentCount,
+          failed: emailsFailedCount,
+          results: emailResults
+        });
+      } else {
+        console.error('[StakingInitiate] ❌ Gmail service not available');
       }
     }
+
+    const duration = Date.now() - startTime;
+    console.log('[StakingInitiate] ✅ Request completed successfully', {
+      meetingId,
+      totalAttendees: eventData.attendees?.length || 0,
+      emailsSent: emailsSentCount,
+      emailsFailed: emailsFailedCount,
+      duration: `${duration}ms`,
+      timestamp: new Date().toISOString()
+    });
 
     return NextResponse.json({
       success: true,
       meetingId,
-      message: `Stake invitations sent to ${eventData.attendees?.length || 0} attendees`,
+      message: `Stake invitations sent to ${emailsSentCount} attendees`,
+      emailsSent: emailsSentCount,
+      emailsFailed: emailsFailedCount,
+      emailResults,
       stakeLink: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/stake/${meetingId}`
     });
 
   } catch (error) {
-    console.error('[Staking] Error initiating stake:', error);
+    const duration = Date.now() - startTime;
+    console.error('[StakingInitiate] ❌ Unhandled error in API', {
+      error: error instanceof Error ? {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      } : error,
+      duration: `${duration}ms`,
+      timestamp: new Date().toISOString()
+    });
     return NextResponse.json(
       { error: 'Failed to initiate staking process' },
       { status: 500 }

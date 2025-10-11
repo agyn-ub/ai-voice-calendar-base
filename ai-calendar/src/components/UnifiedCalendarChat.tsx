@@ -142,10 +142,17 @@ export function UnifiedCalendarChat() {
                   summary: data.pendingEvent.summary,
                   description: data.pendingEvent.description,
                   location: data.pendingEvent.location,
-                  startDateTime: data.pendingEvent.startDateTime,
-                  endDateTime: data.pendingEvent.endDateTime,
-                  attendees: data.pendingEvent.resolvedAttendees,
-                  timezone: timezone,
+                  start: {
+                    dateTime: data.pendingEvent.startDateTime,
+                    timeZone: timezone
+                  },
+                  end: {
+                    dateTime: data.pendingEvent.endDateTime,
+                    timeZone: timezone
+                  },
+                  attendees: data.pendingEvent.resolvedAttendees ? 
+                    data.pendingEvent.resolvedAttendees.map((email: string) => ({ email })) : 
+                    [],
                   stakeRequired: stakeAmount
                 },
                 stakeAmount: stakeAmount
