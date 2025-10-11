@@ -3,6 +3,7 @@ import { googleCalendarService } from '@/lib/services/googleCalendar';
 import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
 import { StakingService } from '@/lib/services/stakingService';
 import { GmailNotificationService } from '@/lib/services/gmailNotificationService';
+import { invitationTokensDb } from '@/lib/db/postgresInvitationTokens';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
           endTime
         );
 
-        // Send stake invitation emails to attendees
+        // Send stake invitation emails to attendees with unique tokens
         if (createdEvent.attendees && createdEvent.attendees.length > 0) {
           try {
             // Create Gmail service for the organizer
@@ -114,18 +115,26 @@ export async function POST(request: NextRequest) {
                 .map(attendee => attendee.email as string);
 
               if (attendeeEmails.length > 0) {
-                // Send stake invitation
-                await gmailService.sendStakeInvitation(attendeeEmails, {
-                  title: createdEvent.summary || 'Meeting',
-                  startTime,
-                  endTime,
-                  stakeAmount: event.stakeRequired,
-                  meetingId,
-                  organizerName: createdEvent.organizer?.displayName,
-                  location: createdEvent.location || undefined
-                });
+                // Generate invitation tokens for all attendees
+                const tokenMap = await invitationTokensDb.createInvitationTokens(meetingId, attendeeEmails);
+                
+                // Send individual stake invitations with unique tokens
+                for (const email of attendeeEmails) {
+                  const token = tokenMap.get(email);
+                  
+                  await gmailService.sendStakeInvitation([email], {
+                    title: createdEvent.summary || 'Meeting',
+                    startTime,
+                    endTime,
+                    stakeAmount: event.stakeRequired,
+                    meetingId,
+                    organizerName: createdEvent.organizer?.displayName,
+                    location: createdEvent.location || undefined,
+                    invitationToken: token // Pass the unique token
+                  });
+                }
 
-                console.log(`[Events] Sent stake invitations to ${attendeeEmails.length} attendees`);
+                console.log(`[Events] Sent stake invitations with tokens to ${attendeeEmails.length} attendees`);
               }
             } else {
               console.warn('[Events] Could not create Gmail service - user may need to reconnect');

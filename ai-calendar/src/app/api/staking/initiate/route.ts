@@ -69,8 +69,12 @@ export async function POST(request: NextRequest) {
     // Generate invitation tokens for attendees
     let tokenMap = new Map<string, string>();
     if (eventData.attendees && eventData.attendees.length > 0) {
-      const attendeeEmails = eventData.attendees.map(a => a.email);
-      tokenMap = await invitationTokensDb.createInvitationTokens(meetingId, attendeeEmails);
+      const attendeeEmails = eventData.attendees
+        .filter(a => a.email) // Filter out attendees without emails
+        .map(a => a.email);
+      if (attendeeEmails.length > 0) {
+        tokenMap = await invitationTokensDb.createInvitationTokens(meetingId, attendeeEmails);
+      }
     }
 
     // Send stake invitation emails with unique tokens
@@ -78,13 +82,23 @@ export async function POST(request: NextRequest) {
       const gmailService = await GmailNotificationService.createFromWallet(walletAddress);
 
       if (gmailService) {
-        // Send individual emails with unique tokens
-        for (const attendee of eventData.attendees) {
-          const token = tokenMap.get(attendee.email);
+        // Filter attendees with valid emails and send individual emails with unique tokens
+        const attendeesWithEmail = eventData.attendees.filter(
+          a => a.email && typeof a.email === 'string' && a.email.trim() !== ''
+        );
+        
+        for (const attendee of attendeesWithEmail) {
+          const normalizedEmail = attendee.email.trim().toLowerCase();
+          const token = tokenMap.get(normalizedEmail);
+          if (!token) {
+            console.warn(`[Staking] No token generated for ${attendee.email}`);
+            continue;
+          }
+          
           const invitationData: StakeInvitationData = {
             title: eventData.summary,
-            startTime: new Date(eventData.startDateTime),
-            endTime: new Date(eventData.endDateTime),
+            startTime: new Date(eventData.start.dateTime),
+            endTime: new Date(eventData.end.dateTime),
             stakeAmount: stakeAmount,
             meetingId: meetingId,
             organizerName: account.google_email?.split('@')[0],
@@ -101,7 +115,7 @@ export async function POST(request: NextRequest) {
             console.warn(`[Staking] Failed to send stake invitation email to ${attendee.email}`);
           }
         }
-        console.log(`[Staking] Sent stake invitations to ${eventData.attendees.length} attendees`);
+        console.log(`[Staking] Sent stake invitations to ${attendeesWithEmail.length} attendees`);
       }
     }
 

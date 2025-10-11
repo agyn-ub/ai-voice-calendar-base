@@ -38,28 +38,41 @@ class InvitationTokensDatabase {
       expiresAt.setDate(expiresAt.getDate() + 7); // Tokens expire in 7 days
 
       for (const email of emails) {
+        // Skip invalid emails - check for undefined, null, non-string, or empty string
+        if (!email || typeof email !== 'string' || email.trim() === '') {
+          console.warn('[InvitationTokens] Skipping invalid email:', email);
+          continue;
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
         const token = this.generateToken();
-        tokenMap.set(email, token);
+        tokenMap.set(normalizedEmail, token);
         
         tokens.push({
           token,
           meeting_id: meetingId,
-          email: email.toLowerCase(),
+          email: normalizedEmail,
           expires_at: expiresAt.toISOString()
         });
       }
 
-      // Bulk insert tokens
-      const { error } = await supabaseAdmin
-        .from(this.tableName)
-        .insert(tokens);
+      // Only insert if we have valid tokens
+      if (tokens.length > 0) {
+        // Bulk insert tokens
+        const { error } = await supabaseAdmin
+          .from(this.tableName)
+          .insert(tokens);
 
-      if (error) {
-        console.error('[InvitationTokens] Error creating tokens:', error);
-        throw error;
+        if (error) {
+          console.error('[InvitationTokens] Error creating tokens:', error);
+          throw error;
+        }
+
+        console.log(`[InvitationTokens] Created ${tokens.length} tokens for meeting ${meetingId}`);
+      } else {
+        console.warn(`[InvitationTokens] No valid emails provided for meeting ${meetingId}`);
       }
-
-      console.log(`[InvitationTokens] Created ${tokens.length} tokens for meeting ${meetingId}`);
+      
       return tokenMap;
     } catch (error) {
       console.error('[InvitationTokens] Failed to create invitation tokens:', error);

@@ -3,13 +3,15 @@ import { postgresPendingMeetingsDb } from '@/lib/db/postgresPendingMeetings';
 import { googleCalendarService } from '@/lib/services/googleCalendar';
 import { GmailNotificationService } from '@/lib/services/gmailNotificationService';
 import { postgresAccountsDb } from '@/lib/db/postgresAccountsDb';
+import { walletEmailAssociationsDb } from '@/lib/db/postgresWalletEmailAssociations';
 
 interface PendingEventData {
   summary: string;
   description?: string;
   location?: string;
-  startDateTime: string;
-  endDateTime: string;
+  // Support both formats for backwards compatibility
+  startDateTime?: string;  // Legacy format
+  endDateTime?: string;    // Legacy format
   start?: {
     dateTime: string;
     timeZone: string;
@@ -64,12 +66,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get staker's email
+    // Get staker's email from multiple sources
     const stakerAccount = await postgresAccountsDb.getAccountByWallet(stakerWallet);
-    const stakerEmailAddress = stakerEmail || stakerAccount?.google_email;
+    const walletAssociation = await walletEmailAssociationsDb.getAssociationByWallet(stakerWallet);
+    
+    // Try to get email from: 1) provided stakerEmail, 2) Google account, 3) wallet association
+    const stakerEmailAddress = stakerEmail || 
+                               stakerAccount?.google_email || 
+                               walletAssociation?.email;
+    
+    // Log which source provided the email
+    if (stakerEmailAddress) {
+      const emailSource = stakerEmail ? 'provided' : 
+                         stakerAccount?.google_email ? 'google_account' : 
+                         'wallet_association';
+      console.log(`[Staking] Found email for staker ${stakerWallet} from ${emailSource}: ${stakerEmailAddress}`);
+    }
 
     if (!stakerEmailAddress) {
-      console.warn(`[Staking] No email found for staker ${stakerWallet}, skipping calendar invite`);
+      console.warn(`[Staking] No email found for staker ${stakerWallet} in any source, skipping calendar invite`);
       return NextResponse.json({
         success: true,
         message: 'Stake recorded but no calendar invite sent (no email found)',
@@ -113,12 +128,12 @@ export async function POST(request: NextRequest) {
       description: `${eventData.description || ''}\n\n💎 This meeting requires a ${pendingMeeting.stake_amount} ETH stake.\nMeeting ID: ${meetingId}`,
       location: eventData.location,
       start: {
-        dateTime: eventData.startDateTime,
-        timeZone: eventData.timezone || 'America/Los_Angeles'
+        dateTime: eventData.start?.dateTime || eventData.startDateTime,
+        timeZone: eventData.start?.timeZone || 'America/Los_Angeles'
       },
       end: {
-        dateTime: eventData.endDateTime,
-        timeZone: eventData.timezone || 'America/Los_Angeles'
+        dateTime: eventData.end?.dateTime || eventData.endDateTime,
+        timeZone: eventData.end?.timeZone || 'America/Los_Angeles'
       },
       attendees: [
         // Only include the organizer and the current staker
