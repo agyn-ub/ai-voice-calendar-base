@@ -48,3 +48,5 @@ calendar-connections.json
 *.db
 *.sqlite
 *.sqlite3
+
+send.txt

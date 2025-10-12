@@ -52,6 +52,8 @@ export default function StakingInterface({
   const [inputCode, setInputCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const [blockchainVerified, setBlockchainVerified] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [contractInstance, setContractInstance] = useState<MeetingStakeContract | null>(null);
 
@@ -140,8 +142,15 @@ export default function StakingInterface({
         Math.floor(new Date(endTime).getTime() / 1000)
       );
       
+      setLastTxHash(receipt.transactionHash);
       toast.success(`Meeting created! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       setSuccess(`Meeting created! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
+      
+      // Verify on blockchain
+      console.log('[StakingInterface] Verifying meeting on blockchain...');
+      const verification = await contractInstance.verifyMeetingOnChain(meetingId);
+      setBlockchainVerified(verification.exists);
+      
       await fetchStakeStatus();
     } catch (error: unknown) {
       const errorMsg = (error instanceof Error ? error.message : String(error)) || 'Failed to create staking requirement';
@@ -166,6 +175,7 @@ export default function StakingInterface({
         String(stakeStatus.meeting.requiredStake)
       );
       
+      setLastTxHash(receipt.transactionHash);
       toast.success(`Successfully staked! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       setSuccess(`Successfully staked! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       await fetchStakeStatus();
@@ -247,6 +257,7 @@ export default function StakingInterface({
     try {
       const receipt = await contractInstance.settleMeeting(meetingId);
       
+      setLastTxHash(receipt.transactionHash);
       toast.success(`Meeting settled! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       setSuccess(`Meeting settled! Transaction: ${receipt.transactionHash.slice(0, 10)}...`);
       await fetchStakeStatus();
@@ -300,6 +311,39 @@ export default function StakingInterface({
     (meeting.status === 'in_progress' || meeting.status === 'check_in_period');
   const canSettle = meeting.status === 'pending_settlement' && !meeting.isSettled;
 
+  const verifyOnBlockchain = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/staking/verify-blockchain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingId, walletAddress })
+      });
+      
+      const data = await response.json();
+      console.log('[StakingInterface] Blockchain verification result:', data);
+      
+      if (data.blockchain.exists) {
+        toast.success('✅ Meeting verified on blockchain!');
+        setBlockchainVerified(true);
+      } else {
+        toast.error('❌ Meeting not found on blockchain');
+      }
+      
+      // Show detailed info in console for debugging
+      console.log('[StakingInterface] Verification Details:', {
+        database: data.database,
+        blockchain: data.blockchain,
+        issues: data.summary.issues
+      });
+    } catch (error) {
+      console.error('[StakingInterface] Verification error:', error);
+      toast.error('Failed to verify on blockchain');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 space-y-4">
       {/* Header */}
@@ -310,16 +354,35 @@ export default function StakingInterface({
             Required Stake: {meeting.requiredStake} ETH
           </p>
         </div>
-        <button
-          onClick={fetchStakeStatus}
-          disabled={isRefreshing}
-          className="text-gray-400 hover:text-white transition-colors"
-          title="Refresh status"
-        >
-          <svg className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={verifyOnBlockchain}
+            disabled={loading}
+            className="text-xs px-2 py-1 bg-blue-600/20 text-blue-400 rounded hover:bg-blue-600/30 transition-colors disabled:opacity-50"
+            title="Verify on blockchain"
+          >
+            {blockchainVerified ? '✅ Verified' : 'Verify'}
+          </button>
+          <a
+            href={`/blockchain-explorer?meeting=${meetingId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs px-2 py-1 bg-purple-600/20 text-purple-400 rounded hover:bg-purple-600/30 transition-colors"
+            title="View on blockchain explorer"
+          >
+            🔍 Explorer
+          </a>
+          <button
+            onClick={fetchStakeStatus}
+            disabled={isRefreshing}
+            className="text-gray-400 hover:text-white transition-colors"
+            title="Refresh status"
+          >
+            <svg className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Status Badge */}
@@ -459,7 +522,26 @@ export default function StakingInterface({
         <p className="text-red-400 text-sm bg-red-900/20 rounded p-2">{error}</p>
       )}
       {success && (
-        <p className="text-green-400 text-sm bg-green-900/20 rounded p-2">{success}</p>
+        <div className="text-green-400 text-sm bg-green-900/20 rounded p-2 space-y-2">
+          <p>{success}</p>
+          {lastTxHash && contractInstance && (
+            <div className="flex items-center gap-2 text-xs">
+              {blockchainVerified && (
+                <span className="text-green-500">✅ Verified on blockchain</span>
+              )}
+              {contractInstance.getExplorerUrl(lastTxHash) && (
+                <a 
+                  href={contractInstance.getExplorerUrl(lastTxHash)} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 underline"
+                >
+                  View on Explorer →
+                </a>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

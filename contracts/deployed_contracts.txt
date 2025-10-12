@@ -1,0 +1,9 @@
+
+##### anvil-hardhat
+✅  [Success] Hash: 0x88460ddb31d8685b1cdf9f7e6ba59444b1b76a4681d6ce8fd2a1d4bbb85a69e8
+Contract Address: 0x5FbDB2315678afecb367f032d93F642f64180aa3
+Block: 9
+Paid: 0.0020809941340689 ETH (1548150 gas * 1.344181206 gwei)
+
+✅ Sequence #1 on anvil-hardhat | Total Paid: 0.0020809941340689 ETH (1548150 gas * avg 1.344181206 gwei)
+                                         

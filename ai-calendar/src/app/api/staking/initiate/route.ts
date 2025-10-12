@@ -24,6 +24,7 @@ export interface PendingEventData {
 }
 
 interface InitiateStakeRequest {
+  meetingId?: string; // Optional for backwards compatibility
   walletAddress: string;
   eventData: PendingEventData;
   stakeAmount: number;
@@ -38,9 +39,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: InitiateStakeRequest = await request.json();
-    const { walletAddress, eventData, stakeAmount } = body;
+    const { meetingId: providedMeetingId, walletAddress, eventData, stakeAmount } = body;
 
     console.log('[StakingInitiate] Request payload', {
+      providedMeetingId,
       walletAddress,
       stakeAmount,
       eventTitle: eventData?.summary,
@@ -79,9 +81,12 @@ export async function POST(request: NextRequest) {
       organizerEmail: account.google_email
     });
 
-    // Generate unique meeting ID
-    const meetingId = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    console.log('[StakingInitiate] Generated meeting ID', { meetingId });
+    // Use provided meeting ID if available, otherwise generate a new one
+    const meetingId = providedMeetingId || `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log('[StakingInitiate] Using meeting ID', { 
+      meetingId,
+      wasProvided: !!providedMeetingId 
+    });
 
     // Note: Blockchain meeting creation must happen on client-side where wallet is connected
     // This endpoint only handles database and email operations

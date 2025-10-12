@@ -1,8 +1,8 @@
 import { meetingStakesDb, type MeetingStakeData as MeetingStakeDataDb, type StakeRecord as StakeRecordDb } from '@/lib/db/postgresMeetingStakes';
 import { postgresPendingMeetingsDb } from '@/lib/db/postgresPendingMeetings';
 
-export interface MeetingStakeData extends MeetingStakeDataDb {}
-export interface StakeRecord extends StakeRecordDb {}
+export type MeetingStakeData = MeetingStakeDataDb;
+export type StakeRecord = StakeRecordDb;
 
 export class StakingService {
   private static CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_MEETING_STAKE_CONTRACT || '0x01';

@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useWalletClient } from "wagmi";
 import { UnifiedChatInput } from "./ui/UnifiedChatInput";
 import { TypingIndicator } from "./ui/TypingIndicator";
 import { AmbiguousContact, PendingEvent } from '@/types/openai';
+import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
+import { parseEther } from 'viem';
 
 interface Message {
   id: string;
@@ -19,6 +21,7 @@ interface Message {
 
 export function UnifiedCalendarChat() {
   const { address: walletAddress } = useAccount();
+  const { data: walletClient } = useWalletClient();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
@@ -126,17 +129,162 @@ export function UnifiedCalendarChat() {
           try {
             // First, create blockchain meeting on client-side where wallet is connected
             const meetingId = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const stakeAmount = data.pendingEvent.stakeRequired || 10;
+            const stakeAmount = data.pendingEvent.stakeRequired || 0.01;
+            
+            console.log('[UnifiedCalendarChat] Generated meeting ID for blockchain:', meetingId);
+            
+            // Show blockchain transaction pending message
+            const blockchainMessage: Message = {
+              id: `assistant-${Date.now()}-blockchain`,
+              type: 'assistant',
+              content: '🔗 Creating meeting on blockchain... Please confirm the transaction in your wallet.',
+              timestamp: new Date(),
+              status: 'sent'
+            };
+            setMessages(prev => [...prev, blockchainMessage]);
 
-            // Note: Blockchain meeting creation will be handled on-chain
-            // when users actually stake through the smart contract
-            console.log(`[UnifiedCalendarChat] Meeting ID generated: ${meetingId}`);
+            // Create meeting on blockchain
+            console.log(`[UnifiedCalendarChat] Creating meeting on blockchain: ${meetingId}`);
+            
+            // Check wallet connection and network
+            if (!walletAddress) {
+              const walletError: Message = {
+                id: `assistant-${Date.now()}-wallet-error`,
+                type: 'assistant',
+                content: '⚠️ Wallet not connected! Please connect your wallet first.',
+                timestamp: new Date(),
+                status: 'error'
+              };
+              setMessages(prev => [...prev, walletError]);
+              setPendingEventData(undefined);
+              return;
+            }
 
-            // Then call API to store in database and send emails
+            if (typeof window !== 'undefined' && window.ethereum) {
+              // Check if we have access to accounts
+              const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+              console.log('[UnifiedCalendarChat] Connected accounts:', accounts);
+              
+              if (!accounts || accounts.length === 0) {
+                const accountError: Message = {
+                  id: `assistant-${Date.now()}-account-error`,
+                  type: 'assistant',
+                  content: '⚠️ No accounts available. Please unlock MetaMask and connect to this site.',
+                  timestamp: new Date(),
+                  status: 'error'
+                };
+                setMessages(prev => [...prev, accountError]);
+                setPendingEventData(undefined);
+                return;
+              }
+
+              const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+              console.log('[UnifiedCalendarChat] Current chain ID:', chainId);
+              
+              if (chainId !== '0x7a69') { // 0x7a69 = 31337 in hex
+                const networkError: Message = {
+                  id: `assistant-${Date.now()}-network-error`,
+                  type: 'assistant',
+                  content: `⚠️ Wrong network! Please switch MetaMask to:\n\n1. Open MetaMask\n2. Click the network dropdown\n3. Select "Localhost 8545"\n4. If not available, add it manually:\n   - Network Name: Anvil\n   - RPC URL: http://127.0.0.1:8545\n   - Chain ID: 31337\n   - Currency Symbol: ETH`,
+                  timestamp: new Date(),
+                  status: 'error'
+                };
+                setMessages(prev => [...prev, networkError]);
+                setPendingEventData(undefined);
+                return;
+              }
+            } else {
+              console.error('[UnifiedCalendarChat] window.ethereum not available');
+            }
+            
+            try {
+              if (!walletClient) {
+                throw new Error('Wallet not connected properly. Please reconnect your wallet.');
+              }
+
+              // Parse datetime strings to Unix timestamps
+              const startTime = Math.floor(new Date(data.pendingEvent.startDateTime).getTime() / 1000);
+              const endTime = Math.floor(new Date(data.pendingEvent.endDateTime).getTime() / 1000);
+              
+              // Import contract ABI and address
+              const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+              const MEETING_STAKE_ABI = [
+                {
+                  name: 'createMeeting',
+                  type: 'function',
+                  inputs: [
+                    { name: 'meetingId', type: 'string' },
+                    { name: 'eventId', type: 'string' },
+                    { name: 'requiredStake', type: 'uint256' },
+                    { name: 'startTime', type: 'uint256' },
+                    { name: 'endTime', type: 'uint256' }
+                  ],
+                  outputs: [],
+                  stateMutability: 'nonpayable'
+                }
+              ] as const;
+
+              console.log('[UnifiedCalendarChat] Sending transaction with walletClient...');
+              
+              // Send transaction using walletClient
+              const hash = await walletClient.writeContract({
+                address: CONTRACT_ADDRESS,
+                abi: MEETING_STAKE_ABI,
+                functionName: 'createMeeting',
+                args: [
+                  meetingId,
+                  data.pendingEvent.summary || 'Meeting',
+                  parseEther(stakeAmount.toString()),
+                  BigInt(startTime),
+                  BigInt(endTime)
+                ]
+              });
+              
+              console.log('[UnifiedCalendarChat] Transaction sent! Hash:', hash);
+              console.log('[UnifiedCalendarChat] Meeting ID used in transaction:', meetingId);
+              
+              // Update message with success
+              setMessages(prev => prev.map(msg => 
+                msg.id === blockchainMessage.id 
+                  ? { ...msg, content: `✅ Meeting created on blockchain! Transaction: ${hash}` }
+                  : msg
+              ));
+              
+              // Optional: Verify the meeting exists on blockchain
+              console.log('[UnifiedCalendarChat] Verifying meeting on blockchain...');
+              try {
+                const verifyResponse = await fetch('/api/staking/verify-blockchain', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ meetingId })
+                });
+                const verifyData = await verifyResponse.json();
+                console.log('[UnifiedCalendarChat] Blockchain verification:', verifyData.blockchain.exists ? '✅ Meeting verified' : '❌ Meeting not found');
+              } catch (verifyError) {
+                console.warn('[UnifiedCalendarChat] Could not verify meeting:', verifyError);
+              }
+            } catch (blockchainError) {
+              console.error('[UnifiedCalendarChat] Blockchain transaction failed:', blockchainError);
+              
+              // Update message with error
+              const errorMsg = blockchainError instanceof Error ? blockchainError.message : 'Unknown error';
+              setMessages(prev => prev.map(msg => 
+                msg.id === blockchainMessage.id 
+                  ? { ...msg, content: `❌ Blockchain transaction failed: ${errorMsg}\n\nPlease ensure:\n1. MetaMask is connected to Localhost 8545\n2. You have ETH in your account\n3. You confirmed the transaction`, status: 'error' as const }
+                  : msg
+              ));
+              
+              // STOP HERE - Don't continue without blockchain
+              setPendingEventData(undefined);
+              return;
+            }
+
+            // Then call API to store in database and send emails (only if blockchain succeeded)
             const stakeResponse = await fetch('/api/staking/initiate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                meetingId: meetingId,  // IMPORTANT: Use the same meeting ID from blockchain!
                 walletAddress: walletAddress,
                 eventData: {
                   summary: data.pendingEvent.summary,
@@ -255,6 +403,26 @@ export function UnifiedCalendarChat() {
           Connected
         </div>
       </div>
+
+      {/* Blockchain Status Bar */}
+      {process.env.NEXT_PUBLIC_NETWORK === 'local' && (
+        <div className="bg-purple-900/20 border-y border-purple-600/30 px-4 py-2">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-purple-400">⛓️ Blockchain: Anvil</span>
+              <span className="text-xs text-gray-400">Contract: 0x5FbDB...0aa3</span>
+            </div>
+            <a
+              href="/blockchain-explorer"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs px-2 py-1 bg-purple-600/30 text-purple-300 rounded hover:bg-purple-600/40 transition-colors"
+            >
+              View Explorer →
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
