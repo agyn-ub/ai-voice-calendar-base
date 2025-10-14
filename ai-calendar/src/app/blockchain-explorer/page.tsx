@@ -12,6 +12,7 @@ const RPC_URL = process.env.NEXT_PUBLIC_NETWORK === 'local' ? 'http://127.0.0.1:
 const MEETING_STAKE_ABI = [
   'function getMeetingInfo(string meetingId) view returns (tuple(string meetingId, string eventId, address organizer, uint256 requiredStake, uint256 startTime, uint256 endTime, uint256 checkInDeadline, string attendanceCode, uint256 codeValidUntil, bool isSettled, uint256 totalStaked, uint256 totalRefunded, uint256 totalForfeited))',
   'function getMeetingStakers(string meetingId) view returns (address[])',
+  'function getStakeInfo(string meetingId, address staker) view returns (tuple(address staker, uint256 amount, uint256 stakedAt, bool hasCheckedIn, uint256 checkInTime, bool isRefunded))',
   'function hasStaked(string meetingId, address staker) view returns (bool)',
   'event MeetingCreated(string indexed meetingId, address indexed organizer, uint256 requiredStake, uint256 startTime, uint256 endTime)',
   'event StakeDeposited(string indexed meetingId, address indexed staker, uint256 amount)',
@@ -20,6 +21,15 @@ const MEETING_STAKE_ABI = [
   'event StakeRefunded(string indexed meetingId, address indexed attendee, uint256 amount)',
   'event MeetingSettled(string indexed meetingId, uint256 totalRefunded, uint256 totalForfeited)'
 ];
+
+interface StakeInfo {
+  staker: string;
+  amount: string;
+  stakedAt: Date;
+  hasCheckedIn: boolean;
+  checkInTime: Date | null;
+  isRefunded: boolean;
+}
 
 interface Meeting {
   meetingId: string;
@@ -35,9 +45,12 @@ interface Meeting {
   totalRefunded: string;
   totalForfeited: string;
   stakers: string[];
+  stakerDetails?: StakeInfo[];
   status: 'upcoming' | 'in_progress' | 'check_in' | 'pending_settlement' | 'settled';
   blockNumber?: number;
   transactionHash?: string;
+  dbStatus?: string;
+  source?: string;
 }
 
 interface BlockchainEvent {
@@ -60,6 +73,7 @@ export default function BlockchainExplorerPage() {
   const [contract, setContract] = useState<ethers.Contract | null>(null);
   const [searchMeetingId, setSearchMeetingId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [expandedMeetings, setExpandedMeetings] = useState<Set<string>>(new Set());
 
   // Check for meeting ID in URL params
   useEffect(() => {
@@ -88,7 +102,7 @@ export default function BlockchainExplorerPage() {
     }
   }, []);
 
-  // Fetch all meetings from events
+  // Fetch all meetings from database and verify on blockchain
   const fetchMeetings = useCallback(async () => {
     if (!contract || !provider) return;
     
@@ -96,15 +110,48 @@ export default function BlockchainExplorerPage() {
       const currentBlock = await provider.getBlockNumber();
       setBlockNumber(currentBlock);
       
-      // Get all MeetingCreated events
-      const filter = contract.filters.MeetingCreated();
-      const events = await contract.queryFilter(filter, 0, currentBlock);
+      // Fetch meeting IDs from database
+      const response = await fetch('/api/blockchain/meetings');
+      const dbData = await response.json();
       
-      const meetingPromises = events.map(async (event) => {
-        const meetingId = (event as any).args?.[0];
+      if (!dbData.success || !dbData.meetings) {
+        console.error('Failed to fetch meetings from database');
+        return;
+      }
+      
+      console.log(`Fetched ${dbData.meetings.length} meetings from database`);
+      
+      // For each meeting ID, verify on blockchain
+      const meetingPromises = dbData.meetings.map(async (dbMeeting: any) => {
+        const meetingId = dbMeeting.id;
         try {
           const info = await contract.getMeetingInfo(meetingId);
+          
+          // Check if meeting exists on blockchain (organizer is not zero address)
+          if (info.organizer === '0x0000000000000000000000000000000000000000') {
+            console.log(`Meeting ${meetingId} not found on blockchain`);
+            return null;
+          }
+          
           const stakers = await contract.getMeetingStakers(meetingId);
+          
+          // Fetch detailed stake info for each staker
+          const stakerDetails: StakeInfo[] = [];
+          for (const stakerAddress of stakers) {
+            try {
+              const stakeInfo = await contract.getStakeInfo(meetingId, stakerAddress);
+              stakerDetails.push({
+                staker: stakeInfo.staker,
+                amount: formatEther(stakeInfo.amount),
+                stakedAt: new Date(Number(stakeInfo.stakedAt) * 1000),
+                hasCheckedIn: stakeInfo.hasCheckedIn,
+                checkInTime: stakeInfo.checkInTime > 0 ? new Date(Number(stakeInfo.checkInTime) * 1000) : null,
+                isRefunded: stakeInfo.isRefunded
+              });
+            } catch (error) {
+              console.error(`Failed to fetch stake info for ${stakerAddress}:`, error);
+            }
+          }
           
           // Determine status
           const now = Math.floor(Date.now() / 1000);
@@ -137,12 +184,14 @@ export default function BlockchainExplorerPage() {
             totalRefunded: formatEther(info.totalRefunded),
             totalForfeited: formatEther(info.totalForfeited),
             stakers: stakers,
+            stakerDetails: stakerDetails,
             status,
-            blockNumber: event.blockNumber,
-            transactionHash: event.transactionHash
+            // Additional DB info
+            dbStatus: dbMeeting.status,
+            source: dbMeeting.source
           } as Meeting;
         } catch (error) {
-          console.error(`Failed to fetch meeting ${meetingId}:`, error);
+          console.error(`Failed to fetch meeting ${meetingId} from blockchain:`, error);
           return null;
         }
       });
@@ -151,12 +200,14 @@ export default function BlockchainExplorerPage() {
       setMeetings(meetingList.reverse()); // Show newest first
       setLastUpdate(new Date());
       
+      console.log(`Successfully loaded ${meetingList.length} meetings from blockchain`);
+      
     } catch (error) {
       console.error('Failed to fetch meetings:', error);
     }
   }, [contract, provider]);
 
-  // Fetch recent events
+  // Fetch recent events (for activity feed, not for meeting discovery)
   const fetchEvents = useCallback(async () => {
     if (!contract || !provider) return;
     
@@ -181,13 +232,60 @@ export default function BlockchainExplorerPage() {
         
         for (const event of events) {
           const block = await provider.getBlock(event.blockNumber);
-          allEvents.push({
+          
+          // Handle indexed string parameters (they come as hashes)
+          // We can't decode the meetingId, but we can show other data
+          let displayData: any = {
             type: eventType.name,
-            meetingId: (event as any).args?.[0] || '',
             blockNumber: event.blockNumber,
             transactionHash: event.transactionHash,
-            timestamp: new Date((block?.timestamp || 0) * 1000),
-            details: (event as any).args
+            timestamp: new Date((block?.timestamp || 0) * 1000)
+          };
+          
+          // Parse non-indexed parameters based on event type
+          const args = (event as any).args;
+          if (args) {
+            switch (eventType.name) {
+              case 'MeetingCreated':
+                // args: [meetingId (indexed), organizer (indexed), requiredStake, startTime, endTime]
+                displayData.organizer = args[1];
+                displayData.requiredStake = args[2] ? formatEther(args[2]) : '0';
+                displayData.startTime = args[3] ? new Date(Number(args[3]) * 1000) : null;
+                displayData.endTime = args[4] ? new Date(Number(args[4]) * 1000) : null;
+                break;
+              case 'StakeDeposited':
+                // args: [meetingId (indexed), staker (indexed), amount]
+                displayData.staker = args[1];
+                displayData.amount = args[2] ? formatEther(args[2]) : '0';
+                break;
+              case 'AttendanceCodeGenerated':
+                // args: [meetingId (indexed), code, validUntil]
+                displayData.code = args[1];
+                displayData.validUntil = args[2] ? new Date(Number(args[2]) * 1000) : null;
+                break;
+              case 'AttendanceConfirmed':
+                // args: [meetingId (indexed), attendee (indexed), code]
+                displayData.attendee = args[1];
+                displayData.code = args[2];
+                break;
+              case 'StakeRefunded':
+              case 'StakeForfeited':
+                // args: [meetingId (indexed), attendee/absentee (indexed), amount]
+                displayData.participant = args[1];
+                displayData.amount = args[2] ? formatEther(args[2]) : '0';
+                break;
+              case 'MeetingSettled':
+                // args: [meetingId (indexed), totalRefunded, totalForfeited]
+                displayData.totalRefunded = args[1] ? formatEther(args[1]) : '0';
+                displayData.totalForfeited = args[2] ? formatEther(args[2]) : '0';
+                break;
+            }
+          }
+          
+          allEvents.push({
+            ...displayData,
+            meetingId: 'Hashed', // Can't decode indexed strings
+            details: displayData
           });
         }
       }
@@ -215,6 +313,24 @@ export default function BlockchainExplorerPage() {
       }
       
       const stakers = await contract.getMeetingStakers(searchMeetingId);
+      
+      // Fetch detailed stake info for each staker
+      const stakerDetails: StakeInfo[] = [];
+      for (const stakerAddress of stakers) {
+        try {
+          const stakeInfo = await contract.getStakeInfo(searchMeetingId, stakerAddress);
+          stakerDetails.push({
+            staker: stakeInfo.staker,
+            amount: formatEther(stakeInfo.amount),
+            stakedAt: new Date(Number(stakeInfo.stakedAt) * 1000),
+            hasCheckedIn: stakeInfo.hasCheckedIn,
+            checkInTime: stakeInfo.checkInTime > 0 ? new Date(Number(stakeInfo.checkInTime) * 1000) : null,
+            isRefunded: stakeInfo.isRefunded
+          });
+        } catch (error) {
+          console.error(`Failed to fetch stake info for ${stakerAddress}:`, error);
+        }
+      }
       
       // Determine status
       const now = Math.floor(Date.now() / 1000);
@@ -247,6 +363,7 @@ export default function BlockchainExplorerPage() {
         totalRefunded: formatEther(info.totalRefunded),
         totalForfeited: formatEther(info.totalForfeited),
         stakers: stakers,
+        stakerDetails: stakerDetails,
         status
       };
       
@@ -284,6 +401,18 @@ export default function BlockchainExplorerPage() {
       return () => clearInterval(interval);
     }
   }, [isMonitoring, contract, provider, fetchMeetings, fetchEvents]);
+
+  const toggleMeetingExpanded = (meetingId: string) => {
+    setExpandedMeetings(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(meetingId)) {
+        newSet.delete(meetingId);
+      } else {
+        newSet.add(meetingId);
+      }
+      return newSet;
+    });
+  };
 
   const getStatusColor = (status: Meeting['status']) => {
     switch (status) {
@@ -385,15 +514,25 @@ export default function BlockchainExplorerPage() {
                     }`}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <div>
+                      <div className="flex-1">
                         <p className="font-semibold text-sm">{meeting.meetingId}</p>
                         <p className="text-xs text-gray-400 mt-1">
                           Organizer: {meeting.organizer.slice(0, 6)}...{meeting.organizer.slice(-4)}
                         </p>
+                        {meeting.source && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Source: {meeting.source === 'pending_meetings' ? '🗎️ DB' : '⛓️ Chain'}
+                          </p>
+                        )}
                       </div>
-                      <span className={`px-2 py-1 rounded text-xs border ${getStatusColor(meeting.status)}`}>
-                        {meeting.status.replace('_', ' ').toUpperCase()}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={`px-2 py-1 rounded text-xs border ${getStatusColor(meeting.status)}`}>
+                          {meeting.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                        <span className="text-xs px-2 py-1 bg-green-600/20 text-green-400 rounded">
+                          ON-CHAIN
+                        </span>
+                      </div>
                     </div>
                     
                     <div className="grid grid-cols-3 gap-2 text-xs">
@@ -410,6 +549,59 @@ export default function BlockchainExplorerPage() {
                         <p className="font-semibold">{meeting.stakers.length}</p>
                       </div>
                     </div>
+                    
+                    {/* Expandable Staker Details Button */}
+                    {meeting.stakers.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleMeetingExpanded(meeting.meetingId);
+                        }}
+                        className="mt-3 w-full flex items-center justify-between px-3 py-2 bg-gray-900 hover:bg-gray-750 rounded text-sm transition-colors"
+                      >
+                        <span className="text-gray-300">
+                          {expandedMeetings.has(meeting.meetingId) ? '▼' : '▶'} View {meeting.stakers.length} Staker{meeting.stakers.length !== 1 ? 's' : ''} Details
+                        </span>
+                        <span className="text-xs text-gray-500">From Blockchain</span>
+                      </button>
+                    )}
+                    
+                    {/* Expanded Staker Details */}
+                    {expandedMeetings.has(meeting.meetingId) && meeting.stakerDetails && (
+                      <div className="mt-2 space-y-2 bg-gray-900 rounded p-3">
+                        <p className="text-xs font-semibold text-gray-300 mb-2">⛓️ Blockchain Staker Information:</p>
+                        {meeting.stakerDetails.map((stake, idx) => (
+                          <div key={idx} className="bg-gray-800 rounded p-2 text-xs space-y-1">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-mono text-blue-400">
+                                  {stake.staker.slice(0, 6)}...{stake.staker.slice(-4)}
+                                </p>
+                                <p className="text-gray-400 mt-1">
+                                  Amount: <span className="text-green-400 font-semibold">{stake.amount} ETH</span>
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                {stake.hasCheckedIn ? (
+                                  <span className="text-green-400">✅ Checked In</span>
+                                ) : (
+                                  <span className="text-yellow-400">⏰ Not Checked In</span>
+                                )}
+                                {stake.isRefunded && (
+                                  <span className="block text-blue-400 mt-1">💸 Refunded</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-gray-500 mt-1">
+                              <p>Staked: {stake.stakedAt.toLocaleString()}</p>
+                              {stake.checkInTime && (
+                                <p>Checked In: {stake.checkInTime.toLocaleString()}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     
                     {meeting.blockNumber && (
                       <p className="text-xs text-gray-500 mt-2">
@@ -437,9 +629,54 @@ export default function BlockchainExplorerPage() {
                         <span className="text-xl">{getEventIcon(event.type)}</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium">{event.type}</p>
-                          <p className="text-xs text-gray-400 truncate">
-                            {event.meetingId}
-                          </p>
+                          
+                          {/* Show event-specific details */}
+                          {event.type === 'MeetingCreated' && event.details.organizer && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              <p>Organizer: {event.details.organizer.slice(0, 6)}...{event.details.organizer.slice(-4)}</p>
+                              <p>Stake: {event.details.requiredStake} ETH</p>
+                              {event.details.startTime && (
+                                <p>Start: {event.details.startTime.toLocaleString()}</p>
+                              )}
+                            </div>
+                          )}
+                          
+                          {event.type === 'StakeDeposited' && event.details.staker && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              <p>Staker: {event.details.staker.slice(0, 6)}...{event.details.staker.slice(-4)}</p>
+                              <p>Amount: {event.details.amount} ETH</p>
+                            </div>
+                          )}
+                          
+                          {event.type === 'AttendanceCodeGenerated' && event.details.code && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              <p>Code: {event.details.code.slice(0, 8)}...</p>
+                              {event.details.validUntil && (
+                                <p>Valid until: {event.details.validUntil.toLocaleTimeString()}</p>
+                              )}
+                            </div>
+                          )}
+                          
+                          {event.type === 'AttendanceConfirmed' && event.details.attendee && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              <p>Attendee: {event.details.attendee.slice(0, 6)}...{event.details.attendee.slice(-4)}</p>
+                            </div>
+                          )}
+                          
+                          {(event.type === 'StakeRefunded' || event.type === 'StakeForfeited') && event.details.participant && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              <p>Participant: {event.details.participant.slice(0, 6)}...{event.details.participant.slice(-4)}</p>
+                              <p>Amount: {event.details.amount} ETH</p>
+                            </div>
+                          )}
+                          
+                          {event.type === 'MeetingSettled' && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              <p>Refunded: {event.details.totalRefunded} ETH</p>
+                              <p>Forfeited: {event.details.totalForfeited} ETH</p>
+                            </div>
+                          )}
+                          
                           <p className="text-xs text-gray-500 mt-1">
                             Block #{event.blockNumber} • {event.timestamp.toLocaleTimeString()}
                           </p>
@@ -509,14 +746,71 @@ export default function BlockchainExplorerPage() {
             
             {selectedMeeting.stakers.length > 0 && (
               <div className="mt-4">
-                <p className="text-sm font-semibold mb-2">Stakers ({selectedMeeting.stakers.length})</p>
-                <div className="bg-gray-900 rounded p-3 max-h-32 overflow-y-auto">
-                  {selectedMeeting.stakers.map((staker, i) => (
-                    <p key={i} className="text-xs font-mono text-gray-400">
-                      {staker}
-                    </p>
-                  ))}
-                </div>
+                <p className="text-sm font-semibold mb-2">
+                  ⛓️ Stakers from Blockchain ({selectedMeeting.stakers.length})
+                </p>
+                
+                {/* Show detailed staker info if available */}
+                {selectedMeeting.stakerDetails && selectedMeeting.stakerDetails.length > 0 ? (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {selectedMeeting.stakerDetails.map((stake, idx) => (
+                      <div key={idx} className="bg-gray-900 rounded p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="text-sm font-mono text-blue-400">
+                              {stake.staker}
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Staked: {stake.stakedAt.toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-green-400">
+                              {stake.amount} ETH
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-gray-500">Check-in Status:</span>
+                            <p className="mt-1">
+                              {stake.hasCheckedIn ? (
+                                <span className="text-green-400">✅ Checked In</span>
+                              ) : (
+                                <span className="text-yellow-400">⏰ Not Checked In</span>
+                              )}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Refund Status:</span>
+                            <p className="mt-1">
+                              {stake.isRefunded ? (
+                                <span className="text-blue-400">💸 Refunded</span>
+                              ) : (
+                                <span className="text-gray-400">Not Refunded</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {stake.checkInTime && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            Checked in at: {stake.checkInTime.toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-900 rounded p-3 max-h-32 overflow-y-auto">
+                    {selectedMeeting.stakers.map((staker, i) => (
+                      <p key={i} className="text-xs font-mono text-gray-400">
+                        {staker}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             

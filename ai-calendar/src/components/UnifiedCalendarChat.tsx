@@ -8,7 +8,7 @@ import { AmbiguousContact, PendingEvent } from '@/types/openai';
 import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
 import { parseEther } from 'viem';
 
-interface Message {
+export interface Message {
   id: string;
   type: 'user' | 'assistant';
   content: string;
@@ -19,12 +19,32 @@ interface Message {
   pendingEvent?: PendingEvent;
 }
 
-export function UnifiedCalendarChat() {
+interface UnifiedCalendarChatProps {
+  messages?: Message[];
+  setMessages?: (messages: Message[] | ((prev: Message[]) => Message[])) => void;
+  conversationId?: string;
+  setConversationId?: (id: string | undefined) => void;
+}
+
+export function UnifiedCalendarChat({ 
+  messages: propMessages, 
+  setMessages: propSetMessages,
+  conversationId: propConversationId,
+  setConversationId: propSetConversationId
+}: UnifiedCalendarChatProps = {}) {
   const { address: walletAddress } = useAccount();
   const { data: walletClient } = useWalletClient();
-  const [messages, setMessages] = useState<Message[]>([]);
+  
+  // Use props if provided, otherwise use local state
+  const [localMessages, setLocalMessages] = useState<Message[]>([]);
+  const [localConversationId, setLocalConversationId] = useState<string | undefined>();
+  
+  const messages = propMessages !== undefined ? propMessages : localMessages;
+  const setMessages = propSetMessages || setLocalMessages;
+  const conversationId = propConversationId !== undefined ? propConversationId : localConversationId;
+  const setConversationId = propSetConversationId || setLocalConversationId;
+  
   const [isProcessing, setIsProcessing] = useState(false);
-  const [conversationId, setConversationId] = useState<string | undefined>();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [pendingEventData, setPendingEventData] = useState<PendingEvent | undefined>();
   const messagesEndRef = useRef<HTMLDivElement>(null);

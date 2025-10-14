@@ -6,6 +6,8 @@ import { useAccount } from 'wagmi';
 import { MeetingStakeData } from '@/lib/services/stakingService';
 import { WalletAuth } from '@/components/WalletAuth';
 import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
+import { formatEther } from 'viem';
+import { CONTRACT_ADDRESSES, CURRENT_NETWORK, NETWORK_CONFIG } from '@/lib/ethereum/config';
 
 export default function StakePage() {
   const params = useParams();
@@ -20,12 +22,65 @@ export default function StakePage() {
   const [hasStaked, setHasStaked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contractInstance, setContractInstance] = useState<MeetingStakeContract | null>(null);
+  
+  // Blockchain data state
+  const [blockchainData, setBlockchainData] = useState<any>(null);
+  const [blockchainStakers, setBlockchainStakers] = useState<string[]>([]);
+  const [isPolling, setIsPolling] = useState(false);
+  const [showBlockchainDetails, setShowBlockchainDetails] = useState(false);
+  const [lastBlockUpdate, setLastBlockUpdate] = useState<Date>(new Date());
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setContractInstance(new MeetingStakeContract());
+      setIsPolling(true); // Start polling by default
     }
   }, []);
+  
+  // Fetch blockchain data
+  const fetchBlockchainData = useCallback(async () => {
+    if (!contractInstance || !meetingId) return;
+    
+    try {
+      const info = await contractInstance.getMeetingInfo(meetingId);
+      const stakers = await contractInstance.getMeetingStakers(meetingId);
+      
+      // Check if meeting exists on blockchain (organizer is not zero address)
+      if (info.organizer !== '0x0000000000000000000000000000000000000000') {
+        setBlockchainData({
+          exists: true,
+          meetingId: info.meetingId,
+          eventId: info.eventId,
+          organizer: info.organizer,
+          requiredStake: formatEther(info.requiredStake),
+          startTime: new Date(Number(info.startTime) * 1000),
+          endTime: new Date(Number(info.endTime) * 1000),
+          checkInDeadline: new Date(Number(info.checkInDeadline) * 1000),
+          hasAttendanceCode: info.attendanceCode !== '',
+          isSettled: info.isSettled,
+          totalStaked: formatEther(info.totalStaked),
+          totalRefunded: formatEther(info.totalRefunded),
+          totalForfeited: formatEther(info.totalForfeited)
+        });
+        setBlockchainStakers(stakers);
+      } else {
+        setBlockchainData({ exists: false });
+      }
+      setLastBlockUpdate(new Date());
+    } catch (error) {
+      console.error('Error fetching blockchain data:', error);
+      setBlockchainData({ exists: false, error: error });
+    }
+  }, [contractInstance, meetingId]);
+  
+  // Polling effect for blockchain data
+  useEffect(() => {
+    if (isPolling && contractInstance) {
+      fetchBlockchainData();
+      const interval = setInterval(fetchBlockchainData, 3000); // Poll every 3 seconds
+      return () => clearInterval(interval);
+    }
+  }, [isPolling, contractInstance, fetchBlockchainData]);
 
 
   const fetchMeetingInfo = useCallback(async () => {
@@ -59,6 +114,22 @@ export default function StakePage() {
   useEffect(() => {
     fetchMeetingInfo();
   }, [fetchMeetingInfo, walletAddress]);
+  
+  // Function to verify blockchain status
+  const verifyBlockchainStatus = async () => {
+    try {
+      const response = await fetch('/api/staking/verify-blockchain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingId, walletAddress })
+      });
+      const data = await response.json();
+      console.log('Blockchain verification:', data);
+      return data;
+    } catch (error) {
+      console.error('Failed to verify blockchain status:', error);
+    }
+  };
 
   const handleStake = async () => {
     if (!walletAddress || !meetingInfo || !contractInstance) return;
@@ -284,6 +355,186 @@ export default function StakePage() {
                     <p className="text-red-400">{error}</p>
                   </div>
                 )}
+
+                {/* Blockchain Data Section */}
+                <div className="border-t border-gray-700 pt-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      ⛓️ Blockchain Data
+                      {blockchainData?.exists && (
+                        <span className="text-xs px-2 py-1 bg-green-600/20 text-green-400 rounded">
+                          ON-CHAIN
+                        </span>
+                      )}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setIsPolling(!isPolling)}
+                        className={`text-xs px-2 py-1 rounded ${
+                          isPolling 
+                            ? 'bg-green-600/20 text-green-400' 
+                            : 'bg-gray-600/20 text-gray-400'
+                        }`}
+                      >
+                        {isPolling ? '● Live' : '○ Paused'}
+                      </button>
+                      <button
+                        onClick={() => setShowBlockchainDetails(!showBlockchainDetails)}
+                        className="text-gray-400 hover:text-white"
+                      >
+                        {showBlockchainDetails ? '▼' : '▶'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick Blockchain Status */}
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="bg-gray-900 p-3 rounded">
+                      <p className="text-xs text-gray-400">Network</p>
+                      <p className="font-semibold text-sm">
+                        {CURRENT_NETWORK === 'local' ? '🟢 Anvil (Local)' : 
+                         CURRENT_NETWORK === 'baseSepolia' ? '🔵 Base Sepolia' : 
+                         '🔷 Base Mainnet'}
+                      </p>
+                    </div>
+                    <div className="bg-gray-900 p-3 rounded">
+                      <p className="text-xs text-gray-400">Contract</p>
+                      <p className="font-mono text-xs">
+                        {CONTRACT_ADDRESSES[CURRENT_NETWORK].meetingStake.slice(0, 6)}...
+                        {CONTRACT_ADDRESSES[CURRENT_NETWORK].meetingStake.slice(-4)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {blockchainData && blockchainData.exists ? (
+                    <>
+                      <div className="bg-gray-900 p-4 rounded-lg space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-400">Blockchain Total Staked</span>
+                          <span className="font-semibold text-green-400">
+                            {blockchainData.totalStaked} ETH
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-400">On-Chain Stakers</span>
+                          <span className="font-semibold">
+                            {blockchainStakers.length}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-400">Settlement Status</span>
+                          <span className={`text-sm ${blockchainData.isSettled ? 'text-green-400' : 'text-yellow-400'}`}>
+                            {blockchainData.isSettled ? 'Settled' : 'Pending'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-400">Last Update</span>
+                          <span className="text-xs text-gray-500">
+                            {lastBlockUpdate.toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Detailed Blockchain Data (Collapsible) */}
+                      {showBlockchainDetails && (
+                        <div className="mt-4 bg-gray-900 p-4 rounded-lg space-y-3">
+                          <h4 className="font-semibold text-sm mb-2">Full Blockchain Data</h4>
+                          
+                          <div className="text-xs space-y-2">
+                            <div>
+                              <span className="text-gray-400">Meeting ID: </span>
+                              <span className="font-mono">{blockchainData.meetingId}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Organizer: </span>
+                              <span className="font-mono">{blockchainData.organizer}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Required Stake: </span>
+                              <span>{blockchainData.requiredStake} ETH</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Start Time: </span>
+                              <span>{blockchainData.startTime.toLocaleString()}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">Check-in Deadline: </span>
+                              <span>{blockchainData.checkInDeadline.toLocaleString()}</span>
+                            </div>
+                            {blockchainData.hasAttendanceCode && (
+                              <div>
+                                <span className="text-gray-400">Attendance Code: </span>
+                                <span className="text-green-400">Generated ✓</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Stakers List */}
+                          {blockchainStakers.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-800">
+                              <p className="text-sm font-semibold mb-2">On-Chain Stakers</p>
+                              <div className="space-y-1">
+                                {blockchainStakers.map((staker, i) => (
+                                  <div key={i} className="flex justify-between items-center">
+                                    <span className="font-mono text-xs text-gray-400">
+                                      {staker.slice(0, 6)}...{staker.slice(-4)}
+                                    </span>
+                                    {staker.toLowerCase() === walletAddress?.toLowerCase() && (
+                                      <span className="text-xs text-green-400">You</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Sync Status */}
+                      <div className="mt-4 p-3 bg-gray-900 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-400">Database vs Blockchain</span>
+                          {meetingInfo && blockchainData && (
+                            <span className={`text-sm ${
+                              meetingInfo.stakes.length === blockchainStakers.length 
+                                ? 'text-green-400' 
+                                : 'text-yellow-400'
+                            }`}>
+                              {meetingInfo.stakes.length === blockchainStakers.length 
+                                ? '✓ Synced' 
+                                : `⚠ DB: ${meetingInfo.stakes.length} | Chain: ${blockchainStakers.length}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* View on Explorer Button */}
+                      <div className="mt-4">
+                        <a
+                          href={`/blockchain-explorer?meeting=${meetingId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded transition-colors"
+                        >
+                          🔍 View on Blockchain Explorer
+                        </a>
+                      </div>
+                    </>
+                  ) : blockchainData && !blockchainData.exists ? (
+                    <div className="bg-gray-900 p-4 rounded-lg">
+                      <p className="text-yellow-400 text-sm">
+                        ⚠️ Meeting not found on blockchain yet
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        The meeting may still be pending or needs to be created on-chain
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-900 p-4 rounded-lg">
+                      <p className="text-gray-400 text-sm">Loading blockchain data...</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

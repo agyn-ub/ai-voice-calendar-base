@@ -1,18 +1,63 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import GoogleCalendarConnect from '@/components/GoogleCalendarConnect';
 import CalendarView from '@/components/CalendarView';
 import { WalletAuth } from '@/components/WalletAuth';
 import { useAccount } from 'wagmi';
-import { UnifiedCalendarChat } from '@/components/UnifiedCalendarChat';
+import { UnifiedCalendarChat, type Message } from '@/components/UnifiedCalendarChat';
+
+const CHAT_STORAGE_KEY = 'ai-calendar-chat-history';
+const CONVERSATION_STORAGE_KEY = 'ai-calendar-conversation-id';
 
 export default function Home() {
   const { address: walletAddress } = useAccount();
   const [calendarUpdateTrigger, setCalendarUpdateTrigger] = useState(0);
   const [showWalletDetails, setShowWalletDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'calendar' | 'settings' | 'blockchain'>('chat');
+  
+  // Chat state lifted up to persist across tab switches
+  const [chatMessages, setChatMessages] = useState<Message[]>([]);
+  const [chatConversationId, setChatConversationId] = useState<string | undefined>();
+  
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedMessages = localStorage.getItem(CHAT_STORAGE_KEY);
+      const savedConversationId = localStorage.getItem(CONVERSATION_STORAGE_KEY);
+      
+      if (savedMessages) {
+        const parsed = JSON.parse(savedMessages);
+        // Convert timestamp strings back to Date objects
+        const messagesWithDates = parsed.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }));
+        setChatMessages(messagesWithDates);
+      }
+      
+      if (savedConversationId) {
+        setChatConversationId(savedConversationId);
+      }
+    } catch (error) {
+      console.error('Failed to load chat history:', error);
+    }
+  }, []);
+  
+  // Save chat history to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      if (chatMessages.length > 0) {
+        localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages));
+      }
+      if (chatConversationId) {
+        localStorage.setItem(CONVERSATION_STORAGE_KEY, chatConversationId);
+      }
+    } catch (error) {
+      console.error('Failed to save chat history:', error);
+    }
+  }, [chatMessages, chatConversationId]);
 
   // Wallet address is now directly from useAccount hook
 
@@ -172,7 +217,28 @@ export default function Home() {
               {/* Tab Content */}
               <div className="min-h-[600px] bg-white dark:bg-gray-900 rounded-lg shadow-lg overflow-hidden">
                 {activeTab === 'chat' && (
-                  <UnifiedCalendarChat />
+                  <div className="relative h-full">
+                    <UnifiedCalendarChat 
+                      messages={chatMessages}
+                      setMessages={setChatMessages}
+                      conversationId={chatConversationId}
+                      setConversationId={setChatConversationId}
+                    />
+                    {chatMessages.length > 0 && (
+                      <button
+                        onClick={() => {
+                          setChatMessages([]);
+                          setChatConversationId(undefined);
+                          localStorage.removeItem(CHAT_STORAGE_KEY);
+                          localStorage.removeItem(CONVERSATION_STORAGE_KEY);
+                        }}
+                        className="absolute top-4 right-4 px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors z-10"
+                        title="Clear chat history"
+                      >
+                        Clear Chat
+                      </button>
+                    )}
+                  </div>
                 )}
                 {activeTab === 'calendar' && (
                   <CalendarView
