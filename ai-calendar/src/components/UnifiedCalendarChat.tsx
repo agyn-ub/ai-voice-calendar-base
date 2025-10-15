@@ -413,30 +413,30 @@ export function UnifiedCalendarChat({
     <div className="flex flex-col h-full bg-white dark:bg-gray-900">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
+          <span className="text-sm text-gray-600 dark:text-gray-400 truncate" title={walletAddress}>
             {walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}
           </span>
         </div>
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="text-sm text-gray-600 dark:text-gray-400 flex-shrink-0">
           Connected
         </div>
       </div>
 
       {/* Blockchain Status Bar */}
       {process.env.NEXT_PUBLIC_NETWORK === 'local' && (
-        <div className="bg-purple-900/20 border-y border-purple-600/30 px-4 py-2">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-purple-400">⛓️ Blockchain: Anvil</span>
-              <span className="text-xs text-gray-400">Contract: 0x5FbDB...0aa3</span>
+        <div className="bg-purple-900/20 border-y border-purple-600/30 px-4 py-2 overflow-hidden">
+          <div className="flex justify-between items-center gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-sm text-purple-400 flex-shrink-0">⛓️ Blockchain: Anvil</span>
+              <span className="text-xs text-gray-400 truncate">Contract: 0x5FbDB...0aa3</span>
             </div>
             <a
               href="/blockchain-explorer"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs px-2 py-1 bg-purple-600/30 text-purple-300 rounded hover:bg-purple-600/40 transition-colors"
+              className="text-xs px-2 py-1 bg-purple-600/30 text-purple-300 rounded hover:bg-purple-600/40 transition-colors flex-shrink-0"
             >
               View Explorer →
             </a>
@@ -515,14 +515,14 @@ export function UnifiedCalendarChat({
                         <button
                           key={`${match.email}-${idx}`}
                           onClick={() => handleContactSelection(match.email)}
-                          className="w-full text-left p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          className="w-full text-left p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors overflow-hidden"
                         >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium text-gray-900 dark:text-gray-100">{match.name}</p>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">{match.email}</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{match.name}</p>
+                              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{match.email}</p>
                             </div>
-                            <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
+                            <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded flex-shrink-0">
                               {(match.confidence * 100).toFixed(0)}% match
                             </span>
                           </div>

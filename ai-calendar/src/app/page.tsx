@@ -117,7 +117,7 @@ export default function Home() {
           {showWalletDetails && walletAddress && (
             <div className="mb-6 bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700 animate-in slide-in-from-top-2">
               <div className="space-y-4">
-                <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+                <div className="bg-gray-900 rounded-lg p-4 border border-gray-700 overflow-hidden">
                   <p className="text-xs text-gray-400 mb-1">Full Wallet Address</p>
                   <p className="text-sm font-mono text-green-400 break-all">
                     {walletAddress}

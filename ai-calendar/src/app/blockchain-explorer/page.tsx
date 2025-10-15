@@ -514,8 +514,10 @@ export default function BlockchainExplorerPage() {
                     }`}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm">{meeting.meetingId}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate" title={meeting.meetingId}>
+                          {meeting.meetingId}
+                        </p>
                         <p className="text-xs text-gray-400 mt-1">
                           Organizer: {meeting.organizer.slice(0, 6)}...{meeting.organizer.slice(-4)}
                         </p>
@@ -572,9 +574,9 @@ export default function BlockchainExplorerPage() {
                         <p className="text-xs font-semibold text-gray-300 mb-2">⛓️ Blockchain Staker Information:</p>
                         {meeting.stakerDetails.map((stake, idx) => (
                           <div key={idx} className="bg-gray-800 rounded p-2 text-xs space-y-1">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-mono text-blue-400">
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="min-w-0">
+                                <p className="font-mono text-blue-400" title={stake.staker}>
                                   {stake.staker.slice(0, 6)}...{stake.staker.slice(-4)}
                                 </p>
                                 <p className="text-gray-400 mt-1">
@@ -626,14 +628,16 @@ export default function BlockchainExplorerPage() {
                   {events.map((event, index) => (
                     <div key={index} className="p-3 hover:bg-gray-750">
                       <div className="flex items-start gap-2">
-                        <span className="text-xl">{getEventIcon(event.type)}</span>
-                        <div className="flex-1 min-w-0">
+                        <span className="text-xl flex-shrink-0">{getEventIcon(event.type)}</span>
+                        <div className="flex-1 min-w-0 overflow-hidden">
                           <p className="text-sm font-medium">{event.type}</p>
                           
                           {/* Show event-specific details */}
                           {event.type === 'MeetingCreated' && event.details.organizer && (
                             <div className="text-xs text-gray-400 mt-1">
-                              <p>Organizer: {event.details.organizer.slice(0, 6)}...{event.details.organizer.slice(-4)}</p>
+                              <p className="truncate" title={event.details.organizer}>
+                                Organizer: {event.details.organizer.slice(0, 6)}...{event.details.organizer.slice(-4)}
+                              </p>
                               <p>Stake: {event.details.requiredStake} ETH</p>
                               {event.details.startTime && (
                                 <p>Start: {event.details.startTime.toLocaleString()}</p>
@@ -643,7 +647,9 @@ export default function BlockchainExplorerPage() {
                           
                           {event.type === 'StakeDeposited' && event.details.staker && (
                             <div className="text-xs text-gray-400 mt-1">
-                              <p>Staker: {event.details.staker.slice(0, 6)}...{event.details.staker.slice(-4)}</p>
+                              <p className="truncate" title={event.details.staker}>
+                                Staker: {event.details.staker.slice(0, 6)}...{event.details.staker.slice(-4)}
+                              </p>
                               <p>Amount: {event.details.amount} ETH</p>
                             </div>
                           )}
@@ -659,13 +665,17 @@ export default function BlockchainExplorerPage() {
                           
                           {event.type === 'AttendanceConfirmed' && event.details.attendee && (
                             <div className="text-xs text-gray-400 mt-1">
-                              <p>Attendee: {event.details.attendee.slice(0, 6)}...{event.details.attendee.slice(-4)}</p>
+                              <p className="truncate" title={event.details.attendee}>
+                                Attendee: {event.details.attendee.slice(0, 6)}...{event.details.attendee.slice(-4)}
+                              </p>
                             </div>
                           )}
                           
                           {(event.type === 'StakeRefunded' || event.type === 'StakeForfeited') && event.details.participant && (
                             <div className="text-xs text-gray-400 mt-1">
-                              <p>Participant: {event.details.participant.slice(0, 6)}...{event.details.participant.slice(-4)}</p>
+                              <p className="truncate" title={event.details.participant}>
+                                Participant: {event.details.participant.slice(0, 6)}...{event.details.participant.slice(-4)}
+                              </p>
                               <p>Amount: {event.details.amount} ETH</p>
                             </div>
                           )}
@@ -704,17 +714,23 @@ export default function BlockchainExplorerPage() {
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-gray-400">Meeting ID</p>
-                <p className="text-sm font-mono">{selectedMeeting.meetingId}</p>
+                <p className="text-sm font-mono break-all" title={selectedMeeting.meetingId}>
+                  {selectedMeeting.meetingId}
+                </p>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-gray-400">Event ID</p>
-                <p className="text-sm font-mono">{selectedMeeting.eventId || 'N/A'}</p>
+                <p className="text-sm font-mono truncate" title={selectedMeeting.eventId || 'N/A'}>
+                  {selectedMeeting.eventId || 'N/A'}
+                </p>
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-gray-400">Organizer</p>
-                <p className="text-sm font-mono">{selectedMeeting.organizer}</p>
+                <p className="text-sm font-mono break-all" title={selectedMeeting.organizer}>
+                  {selectedMeeting.organizer}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-400">Required Stake</p>
@@ -755,9 +771,9 @@ export default function BlockchainExplorerPage() {
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {selectedMeeting.stakerDetails.map((stake, idx) => (
                       <div key={idx} className="bg-gray-900 rounded p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className="text-sm font-mono text-blue-400">
+                        <div className="flex justify-between items-start mb-2 gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-mono text-blue-400 break-all">
                               {stake.staker}
                             </p>
                             <p className="text-xs text-gray-400 mt-1">

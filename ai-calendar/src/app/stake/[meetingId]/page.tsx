@@ -229,8 +229,8 @@ export default function StakePage() {
             {/* Meeting Details */}
             <div className="p-8">
               <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-semibold mb-4">
+                <div className="min-w-0">
+                  <h2 className="text-2xl font-semibold mb-4 break-all">
                     Meeting {meetingInfo.meetingId}
                   </h2>
                 </div>
@@ -255,9 +255,9 @@ export default function StakePage() {
                     </p>
                   </div>
                   {/* Location field removed - not in MeetingStakeData */}
-                  <div className="bg-gray-900 p-4 rounded-lg">
+                  <div className="bg-gray-900 p-4 rounded-lg min-w-0">
                     <p className="text-sm text-gray-400 mb-1">Organizer</p>
-                    <p className="font-semibold">
+                    <p className="font-semibold break-all">
                       {meetingInfo.organizer}
                     </p>
                   </div>
@@ -441,13 +441,13 @@ export default function StakePage() {
                           <h4 className="font-semibold text-sm mb-2">Full Blockchain Data</h4>
                           
                           <div className="text-xs space-y-2">
-                            <div>
+                            <div className="overflow-hidden">
                               <span className="text-gray-400">Meeting ID: </span>
-                              <span className="font-mono">{blockchainData.meetingId}</span>
+                              <span className="font-mono break-all">{blockchainData.meetingId}</span>
                             </div>
-                            <div>
+                            <div className="overflow-hidden">
                               <span className="text-gray-400">Organizer: </span>
-                              <span className="font-mono">{blockchainData.organizer}</span>
+                              <span className="font-mono break-all">{blockchainData.organizer}</span>
                             </div>
                             <div>
                               <span className="text-gray-400">Required Stake: </span>
@@ -475,12 +475,12 @@ export default function StakePage() {
                               <p className="text-sm font-semibold mb-2">On-Chain Stakers</p>
                               <div className="space-y-1">
                                 {blockchainStakers.map((staker, i) => (
-                                  <div key={i} className="flex justify-between items-center">
-                                    <span className="font-mono text-xs text-gray-400">
+                                  <div key={i} className="flex justify-between items-center gap-2">
+                                    <span className="font-mono text-xs text-gray-400 truncate" title={staker}>
                                       {staker.slice(0, 6)}...{staker.slice(-4)}
                                     </span>
                                     {staker.toLowerCase() === walletAddress?.toLowerCase() && (
-                                      <span className="text-xs text-green-400">You</span>
+                                      <span className="text-xs text-green-400 flex-shrink-0">You</span>
                                     )}
                                   </div>
                                 ))}
