@@ -1,25 +1,6 @@
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESSES, CURRENT_NETWORK, NETWORK_CONFIG } from './config';
-
-// ABI for MeetingStake contract - simplified version
-const MEETING_STAKE_ABI = [
-  'function createMeeting(string meetingId, string eventId, uint256 requiredStake, uint256 startTime, uint256 endTime) external',
-  'function stake(string meetingId) external payable',
-  'function generateAttendanceCode(string meetingId, string code) external',
-  'function submitAttendanceCode(string meetingId, string code) external',
-  'function settleMeeting(string meetingId) external',
-  'function getMeetingInfo(string meetingId) external view returns (tuple(string meetingId, string eventId, address organizer, uint256 requiredStake, uint256 startTime, uint256 endTime, uint256 checkInDeadline, string attendanceCode, uint256 codeValidUntil, bool isSettled, uint256 totalStaked, uint256 totalRefunded, uint256 totalForfeited))',
-  'function getStakeInfo(string meetingId, address staker) external view returns (tuple(address staker, uint256 amount, uint256 stakedAt, bool hasCheckedIn, uint256 checkInTime, bool isRefunded))',
-  'function hasStaked(string meetingId, address staker) external view returns (bool)',
-  'function getMeetingStakers(string meetingId) external view returns (address[])',
-  'event MeetingCreated(string indexed meetingId, address indexed organizer, uint256 requiredStake, uint256 startTime, uint256 endTime)',
-  'event StakeDeposited(string indexed meetingId, address indexed staker, uint256 amount)',
-  'event AttendanceCodeGenerated(string indexed meetingId, string code, uint256 validUntil)',
-  'event AttendanceConfirmed(string indexed meetingId, address indexed attendee, string code)',
-  'event StakeRefunded(string indexed meetingId, address indexed attendee, uint256 amount)',
-  'event StakeForfeited(string indexed meetingId, address indexed absentee, uint256 amount)',
-  'event MeetingSettled(string indexed meetingId, uint256 totalRefunded, uint256 totalForfeited)',
-];
+import { MEETING_STAKE_ABI } from '../contracts/MeetingStakeABI';
 
 export class MeetingStakeContract {
   private contract: ethers.Contract | null = null;

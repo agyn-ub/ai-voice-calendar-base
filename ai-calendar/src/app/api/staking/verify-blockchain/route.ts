@@ -3,6 +3,7 @@ import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
 import { postgresPendingMeetingsDb } from '@/lib/db/postgresPendingMeetings';
 import { ethers } from 'ethers';
 import { CONTRACT_ADDRESSES, CURRENT_NETWORK, NETWORK_CONFIG } from '@/lib/ethereum/config';
+import { MEETING_STAKE_ABI } from '@/lib/contracts/MeetingStakeABI';
 
 interface VerifyRequest {
   meetingId: string;
@@ -37,11 +38,6 @@ export async function POST(request: NextRequest) {
     const provider = new ethers.JsonRpcProvider(NETWORK_CONFIG[CURRENT_NETWORK].rpcUrl);
     const contractAddress = CONTRACT_ADDRESSES[CURRENT_NETWORK].meetingStake;
     
-    const MEETING_STAKE_ABI = [
-      'function getMeetingInfo(string meetingId) external view returns (tuple(string meetingId, string eventId, address organizer, uint256 requiredStake, uint256 startTime, uint256 endTime, uint256 checkInDeadline, string attendanceCode, uint256 codeValidUntil, bool isSettled, uint256 totalStaked, uint256 totalRefunded, uint256 totalForfeited))',
-      'function hasStaked(string meetingId, address staker) external view returns (bool)',
-      'function getMeetingStakers(string meetingId) external view returns (address[])'
-    ];
 
     const contract = new ethers.Contract(contractAddress, MEETING_STAKE_ABI, provider);
 

@@ -6,6 +6,7 @@ import { UnifiedChatInput } from "./ui/UnifiedChatInput";
 import { TypingIndicator } from "./ui/TypingIndicator";
 import { AmbiguousContact, PendingEvent } from '@/types/openai';
 import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
+import { MEETING_STAKE_ABI } from '@/lib/contracts/MeetingStakeABI';
 import { parseEther } from 'viem';
 
 export interface Message {
@@ -228,21 +229,6 @@ export function UnifiedCalendarChat({
               
               // Import contract ABI and address
               const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
-              const MEETING_STAKE_ABI = [
-                {
-                  name: 'createMeeting',
-                  type: 'function',
-                  inputs: [
-                    { name: 'meetingId', type: 'string' },
-                    { name: 'eventId', type: 'string' },
-                    { name: 'requiredStake', type: 'uint256' },
-                    { name: 'startTime', type: 'uint256' },
-                    { name: 'endTime', type: 'uint256' }
-                  ],
-                  outputs: [],
-                  stateMutability: 'nonpayable'
-                }
-              ] as const;
 
               console.log('[UnifiedCalendarChat] Sending transaction with walletClient...');
               

@@ -4,23 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { formatEther } from 'viem';
 import toast, { Toaster } from 'react-hot-toast';
+import { MEETING_STAKE_ABI } from '@/lib/contracts/MeetingStakeABI';
 
 // Contract configuration
 const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
 const RPC_URL = process.env.NEXT_PUBLIC_NETWORK === 'local' ? 'http://127.0.0.1:8545' : '';
 
-const MEETING_STAKE_ABI = [
-  'function getMeetingInfo(string meetingId) view returns (tuple(string meetingId, string eventId, address organizer, uint256 requiredStake, uint256 startTime, uint256 endTime, uint256 checkInDeadline, string attendanceCode, uint256 codeValidUntil, bool isSettled, uint256 totalStaked, uint256 totalRefunded, uint256 totalForfeited))',
-  'function getMeetingStakers(string meetingId) view returns (address[])',
-  'function getStakeInfo(string meetingId, address staker) view returns (tuple(address staker, uint256 amount, uint256 stakedAt, bool hasCheckedIn, uint256 checkInTime, bool isRefunded))',
-  'function hasStaked(string meetingId, address staker) view returns (bool)',
-  'event MeetingCreated(string indexed meetingId, address indexed organizer, uint256 requiredStake, uint256 startTime, uint256 endTime)',
-  'event StakeDeposited(string indexed meetingId, address indexed staker, uint256 amount)',
-  'event AttendanceCodeGenerated(string indexed meetingId, string code, uint256 validUntil)',
-  'event AttendanceConfirmed(string indexed meetingId, address indexed attendee, string code)',
-  'event StakeRefunded(string indexed meetingId, address indexed attendee, uint256 amount)',
-  'event MeetingSettled(string indexed meetingId, uint256 totalRefunded, uint256 totalForfeited)'
-];
 
 interface StakeInfo {
   staker: string;
