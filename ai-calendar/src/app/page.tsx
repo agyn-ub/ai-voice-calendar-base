@@ -7,6 +7,7 @@ import CalendarView from '@/components/CalendarView';
 import { WalletAuth } from '@/components/WalletAuth';
 import { useAccount } from 'wagmi';
 import { UnifiedCalendarChat, type Message } from '@/components/UnifiedCalendarChat';
+import ContactsManager from '@/components/ContactsManager';
 
 const CHAT_STORAGE_KEY = 'ai-calendar-chat-history';
 const CONVERSATION_STORAGE_KEY = 'ai-calendar-conversation-id';
@@ -15,7 +16,7 @@ export default function Home() {
   const { address: walletAddress } = useAccount();
   const [calendarUpdateTrigger, setCalendarUpdateTrigger] = useState(0);
   const [showWalletDetails, setShowWalletDetails] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'calendar' | 'settings' | 'blockchain'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'calendar' | 'settings' | 'contacts' | 'blockchain'>('chat');
   
   // Chat state lifted up to persist across tab switches
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
@@ -196,6 +197,22 @@ export default function Home() {
                     <span>Settings</span>
                   </button>
 
+                  {/* Contacts Tab */}
+                  <button
+                    onClick={() => setActiveTab('contacts')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
+                      activeTab === 'contacts'
+                        ? 'bg-gradient-to-r from-green-600 to-blue-600 text-white shadow-lg'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    }`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span>Contacts</span>
+                  </button>
+
                   {/* Blockchain Tab */}
                   <button
                     onClick={() => setActiveTab('blockchain')}
@@ -249,6 +266,11 @@ export default function Home() {
                 {activeTab === 'settings' && (
                   <div className="p-6">
                     <GoogleCalendarConnect walletAddress={walletAddress} key={calendarUpdateTrigger} />
+                  </div>
+                )}
+                {activeTab === 'contacts' && (
+                  <div className="p-6">
+                    <ContactsManager walletAddress={walletAddress} />
                   </div>
                 )}
                 {activeTab === 'blockchain' && (
