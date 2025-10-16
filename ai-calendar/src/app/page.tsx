@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import GoogleCalendarConnect from '@/components/GoogleCalendarConnect';
@@ -61,10 +63,6 @@ export default function Home() {
   }, [chatMessages, chatConversationId]);
 
   // Wallet address is now directly from useAccount hook
-
-  const handleCalendarUpdate = () => {
-    setCalendarUpdateTrigger(prev => prev + 1);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">

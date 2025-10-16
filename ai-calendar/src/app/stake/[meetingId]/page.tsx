@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
@@ -7,7 +9,7 @@ import { MeetingStakeData } from '@/lib/services/stakingService';
 import { WalletAuth } from '@/components/WalletAuth';
 import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
 import { formatEther } from 'viem';
-import { CONTRACT_ADDRESSES, CURRENT_NETWORK, NETWORK_CONFIG } from '@/lib/ethereum/config';
+import { CONTRACT_ADDRESSES, CURRENT_NETWORK } from '@/lib/ethereum/config';
 
 export default function StakePage() {
   const params = useParams();

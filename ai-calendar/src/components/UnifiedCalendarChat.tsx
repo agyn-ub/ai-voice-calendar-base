@@ -5,7 +5,6 @@ import { useAccount, useWalletClient } from "wagmi";
 import { UnifiedChatInput } from "./ui/UnifiedChatInput";
 import { TypingIndicator } from "./ui/TypingIndicator";
 import { AmbiguousContact, PendingEvent } from '@/types/openai';
-import { MeetingStakeContract } from '@/lib/ethereum/meetingStakeContract';
 import { MEETING_STAKE_ABI } from '@/lib/contracts/MeetingStakeABI';
 import { parseEther } from 'viem';
 
